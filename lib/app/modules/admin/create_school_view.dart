@@ -1,0 +1,419 @@
+import 'dart:io';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:get/get.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:flutter_animate/flutter_animate.dart';
+import 'package:intl/intl.dart';
+import '../../core/widgets/stadium_background.dart';
+import '../../core/widgets/glass_card.dart';
+import '../../core/widgets/glass_text_field.dart';
+import '../../core/widgets/arena_button.dart';
+import 'admin_controller.dart';
+
+class CreateSchoolView extends GetView<AdminController> {
+  const CreateSchoolView({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      body: StadiumBackground(
+        child: SafeArea(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Top Bar
+              Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: const Color(0x0DFFFFFF),
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.1),
+                          ),
+                        ),
+                        child: IconButton(
+                          icon: const Icon(
+                            Icons.arrow_back,
+                            color: Colors.white,
+                          ),
+                          onPressed: () => Get.back(),
+                        ),
+                      ),
+                    ),
+                    Text(
+                      'NEW SCHOOL',
+                      style: GoogleFonts.spaceGrotesk(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                        letterSpacing: 4.0,
+                      ),
+                    ),
+                  ],
+                ).animate().fade().slideX(begin: -0.2),
+              ),
+
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Unified Form Card
+                      GlassCard(
+                        padding: const EdgeInsets.all(24.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Image Upload UI
+                            Center(
+                              child: GestureDetector(
+                                onTap: controller.pickSchoolLogo,
+                                child: Obx(
+                                  () => Container(
+                                    width: 100,
+                                    height: 100,
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withValues(
+                                        alpha: 0.05,
+                                      ),
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                        color: const Color(
+                                          0xFF00A1FF,
+                                        ).withValues(alpha: 0.5),
+                                      ),
+                                      image:
+                                          controller.selectedSchoolLogo.value !=
+                                              null
+                                          ? DecorationImage(
+                                              image: FileImage(
+                                                controller
+                                                    .selectedSchoolLogo
+                                                    .value!,
+                                              ),
+                                              fit: BoxFit.cover,
+                                            )
+                                          : null,
+                                    ),
+                                    child:
+                                        controller.selectedSchoolLogo.value ==
+                                            null
+                                        ? const Icon(
+                                            Icons.add_a_photo,
+                                            color: Colors.white54,
+                                            size: 32,
+                                          )
+                                        : null,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 32),
+
+                            Text(
+                              'SCHOOL DETAILS',
+                              style: GoogleFonts.spaceGrotesk(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: const Color(0xFF00A1FF),
+                                letterSpacing: 1.5,
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            GlassTextField(
+                              hintText: 'Enter school name',
+                              prefixIcon: Icons.domain,
+                              controller: controller.nameController,
+                            ),
+                            const SizedBox(height: 16),
+                            GlassTextField(
+                              hintText: 'email@school.edu',
+                              prefixIcon: Icons.email_outlined,
+                              controller: controller.emailController,
+                            ),
+                            const SizedBox(height: 32),
+                            Divider(
+                              color: Colors.white.withValues(alpha: 0.1),
+                              height: 1,
+                            ),
+                            const SizedBox(height: 32),
+
+                            Text(
+                              'SUBSCRIPTION',
+                              style: GoogleFonts.spaceGrotesk(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white54,
+                                letterSpacing: 1.5,
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+
+                            GestureDetector(
+                              onTap: () async {
+                                final picked = await showDatePicker(
+                                  context: context,
+                                  initialDate:
+                                      controller.expiryDate.value ??
+                                      DateTime.now(),
+                                  firstDate: DateTime.now(),
+                                  lastDate: DateTime.now().add(
+                                    const Duration(days: 365 * 10),
+                                  ),
+                                );
+                                if (picked != null) {
+                                  controller.expiryDate.value = picked;
+                                }
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 20.0,
+                                  vertical: 16.0,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.05),
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(
+                                    color: Colors.white.withValues(alpha: 0.1),
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          'YEARLY',
+                                          style: GoogleFonts.spaceGrotesk(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 16,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Obx(
+                                          () => Text(
+                                            'EXPIRES ${DateFormat('MMM yyyy').format(controller.expiryDate.value ?? DateTime.now()).toUpperCase()}',
+                                            style: GoogleFonts.spaceGrotesk(
+                                              color: Colors.white54,
+                                              fontSize: 12,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 12,
+                                        vertical: 6,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: const Color(
+                                          0xFF39FF14,
+                                        ).withValues(alpha: 0.1),
+                                        borderRadius: BorderRadius.circular(16),
+                                        border: Border.all(
+                                          color: const Color(
+                                            0xFF39FF14,
+                                          ).withValues(alpha: 0.3),
+                                        ),
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          Container(
+                                            width: 8,
+                                            height: 8,
+                                            decoration: const BoxDecoration(
+                                              color: Color(0xFF39FF14),
+                                              shape: BoxShape.circle,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 6),
+                                          Text(
+                                            'ACTIVE',
+                                            style: GoogleFonts.spaceGrotesk(
+                                              color: const Color(0xFF39FF14),
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.bold,
+                                              letterSpacing: 1.0,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ).animate(delay: 200.ms).fade().slideY(begin: 0.2),
+                      const SizedBox(height: 32),
+
+                      // Info box
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: const Color(0x0D00A1FF),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0x3300A1FF)),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Icon(
+                              Icons.info_outline,
+                              color: Color(0xFF00A1FF),
+                              size: 20,
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                'The Coach will set up the team logo and colors after joining the dashboard.',
+                                style: GoogleFonts.spaceGrotesk(
+                                  color: Colors.white70,
+                                  fontSize: 12,
+                                  height: 1.5,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ).animate(delay: 500.ms).fade(),
+                      const SizedBox(height: 48),
+
+                      // Submit button or Generated Code
+                      Obx(() {
+                        if (controller.generatedSchoolCode.value.isNotEmpty) {
+                          return Column(
+                            children: [
+                              GestureDetector(
+                                onTap: () {
+                                  Clipboard.setData(
+                                    ClipboardData(
+                                      text:
+                                          controller.generatedSchoolCode.value,
+                                    ),
+                                  );
+                                  Get.snackbar(
+                                    'Copied',
+                                    'Code copied to clipboard',
+                                    snackPosition: SnackPosition.BOTTOM,
+                                    backgroundColor: Colors.green.withValues(
+                                      alpha: 0.8,
+                                    ),
+                                    colorText: Colors.white,
+                                  );
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 24,
+                                    vertical: 16,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withValues(alpha: 0.05),
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: const Color(
+                                        0xFF00A1FF,
+                                      ).withValues(alpha: 0.5),
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(
+                                        controller.generatedSchoolCode.value,
+                                        style: GoogleFonts.spaceGrotesk(
+                                          color: Colors.white,
+                                          fontSize: 28,
+                                          fontWeight: FontWeight.bold,
+                                          letterSpacing: 4,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 16),
+                                      IconButton(
+                                        icon: const Icon(
+                                          Icons.copy,
+                                          color: Color(0xFF00A1FF),
+                                        ),
+                                        onPressed: () {
+                                          Clipboard.setData(
+                                            ClipboardData(
+                                              text: controller
+                                                  .generatedSchoolCode
+                                                  .value,
+                                            ),
+                                          );
+                                          Get.snackbar(
+                                            'Copied',
+                                            'Code copied to clipboard',
+                                            snackPosition: SnackPosition.BOTTOM,
+                                            backgroundColor: Colors.green
+                                                .withValues(alpha: 0.8),
+                                            colorText: Colors.white,
+                                          );
+                                        },
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ).animate().fade().scale(),
+                              const SizedBox(height: 24),
+                              ArenaButton(
+                                label: 'DONE',
+                                onPressed: () {
+                                  Get.back();
+                                },
+                              ).animate().fade().slideY(begin: 0.2),
+                            ],
+                          );
+                        }
+
+                        return Column(
+                          children: [
+                            ArenaButton(
+                              label: 'GENERATE SCHOOL CODE & CREATE',
+                              isLoading: controller.isCreating.value,
+                              icon: Icons.auto_awesome,
+                              iconRight: true,
+                              fontSize: 14,
+                              onPressed: () => controller.createSchool(),
+                            ).animate(delay: 600.ms).fade().slideY(begin: 0.2),
+                            const SizedBox(height: 10),
+                            Center(
+                              child: Text(
+                                'A unique 6-character access code will be generated automatically',
+                                style: GoogleFonts.spaceGrotesk(
+                                  color: Colors.white38,
+                                  fontSize: 10,
+                                ),
+                              ),
+                            ).animate(delay: 700.ms).fade(),
+                          ],
+                        );
+                      }),
+                      const SizedBox(height: 48),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}

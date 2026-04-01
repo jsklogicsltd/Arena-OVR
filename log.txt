@@ -1,0 +1,42 @@
+Analyzing arena_ovr...                                          
+
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/app/core/theme/theme_controller.dart:13:41 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/app/core/theme/theme_controller.dart:18:42 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/app/core/theme/theme_controller.dart:20:43 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/app/core/theme/theme_controller.dart:21:44 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/app/core/widgets/arena_button.dart:29:51 • deprecated_member_use
+  error • The named parameter 'onPressed' isn't defined • lib/app/core/widgets/arena_button.dart:39:13 • undefined_named_parameter
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/app/core/widgets/bottom_nav_bar.dart:27:46 • deprecated_member_use
+warning • The value of the local variable 'isActive' isn't used • lib/app/core/widgets/bottom_nav_bar.dart:75:11 • unused_local_variable
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/app/core/widgets/bottom_nav_bar.dart:90:53 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/app/core/widgets/glass_text_field.dart:61:57 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/app/core/widgets/stadium_background.dart:33:34 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/app/core/widgets/stadium_background.dart:34:33 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/app/core/widgets/stadium_background.dart:52:34 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/app/core/widgets/stadium_background.dart:53:33 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/app/core/widgets/stadium_background.dart:70:42 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/app/core/widgets/stadium_background.dart:71:42 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/app/core/widgets/tier_border.dart:30:32 • deprecated_member_use
+warning • Unused import: 'package:cloud_firestore/cloud_firestore.dart' • lib/app/data/repositories/rating_repository.dart:4:8 • unused_import
+   info • Parameter 'key' could be a super parameter • lib/app/modules/admin/admin_view.dart:6:9 • use_super_parameters
+   info • Parameter 'key' could be a super parameter • lib/app/modules/auth/auth_view.dart:6:9 • use_super_parameters
+   info • Parameter 'key' could be a super parameter • lib/app/modules/badges/badges_view.dart:6:9 • use_super_parameters
+   info • Parameter 'key' could be a super parameter • lib/app/modules/coach/coach_view.dart:6:9 • use_super_parameters
+   info • Parameter 'key' could be a super parameter • lib/app/modules/feed/feed_view.dart:6:9 • use_super_parameters
+   info • Parameter 'key' could be a super parameter • lib/app/modules/invite_code/invite_code_view.dart:6:9 • use_super_parameters
+   info • Parameter 'key' could be a super parameter • lib/app/modules/leaderboard/leaderboard_view.dart:6:9 • use_super_parameters
+   info • Parameter 'key' could be a super parameter • lib/app/modules/notifications/notifications_view.dart:6:9 • use_super_parameters
+   info • Parameter 'key' could be a super parameter • lib/app/modules/player/player_view.dart:6:9 • use_super_parameters
+   info • Parameter 'key' could be a super parameter • lib/app/modules/settings/settings_view.dart:6:9 • use_super_parameters
+   info • The constant name 'SPLASH' isn't a lowerCamelCase identifier • lib/app/routes/app_routes.dart:2:16 • constant_identifier_names
+   info • The constant name 'AUTH' isn't a lowerCamelCase identifier • lib/app/routes/app_routes.dart:3:16 • constant_identifier_names
+   info • The constant name 'INVITE_CODE' isn't a lowerCamelCase identifier • lib/app/routes/app_routes.dart:4:16 • constant_identifier_names
+   info • The constant name 'ADMIN' isn't a lowerCamelCase identifier • lib/app/routes/app_routes.dart:5:16 • constant_identifier_names
+   info • The constant name 'COACH' isn't a lowerCamelCase identifier • lib/app/routes/app_routes.dart:6:16 • constant_identifier_names
+   info • The constant name 'PLAYER' isn't a lowerCamelCase identifier • lib/app/routes/app_routes.dart:7:16 • constant_identifier_names
+   info • The constant name 'LEADERBOARD' isn't a lowerCamelCase identifier • lib/app/routes/app_routes.dart:8:16 • constant_identifier_names
+   info • The constant name 'FEED' isn't a lowerCamelCase identifier • lib/app/routes/app_routes.dart:9:16 • constant_identifier_names
+   info • The constant name 'NOTIFICATIONS' isn't a lowerCamelCase identifier • lib/app/routes/app_routes.dart:10:16 • constant_identifier_names
+   info • The constant name 'BADGES' isn't a lowerCamelCase identifier • lib/app/routes/app_routes.dart:11:16 • constant_identifier_names
+   info • The constant name 'SETTINGS' isn't a lowerCamelCase identifier • lib/app/routes/app_routes.dart:12:16 • constant_identifier_names
+

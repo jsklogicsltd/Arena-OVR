@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "533126310016",
+    "project_id": "arena-ovr",
+    "storage_bucket": "arena-ovr.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:533126310016:android:76e4e538c79e3527865e65",
+        "android_client_info": {
+          "package_name": "com.arenaovr.scoreapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDvBRImg4obfJV2qUksw9v64HcWAGzFLG0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
