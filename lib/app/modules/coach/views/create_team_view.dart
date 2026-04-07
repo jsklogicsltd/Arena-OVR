@@ -12,6 +12,7 @@ import '../coach_controller.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/widgets/stadium_background.dart';
 import '../../../core/widgets/glass_card.dart';
+import '../../../core/components/animated_glowing_border.dart';
 import '../../../data/models/team_model.dart';
 import '../../../routes/app_routes.dart';
 
@@ -23,12 +24,24 @@ class CreateTeamView extends StatefulWidget {
 }
 
 class _CreateTeamViewState extends State<CreateTeamView> {
+  static const String _kOtherCustom = '__OTHER_CUSTOM__';
+
   final CoachController controller = Get.find<CoachController>();
   final TextEditingController _nameController = TextEditingController();
-  
-  String selectedSport = 'FOOTBALL';
-  final List<String> sports = ['FOOTBALL', 'BASKETBALL', 'BASEBALL', 'SOCCER', 'TRACK', 'VOLLEYBALL'];
-  
+  final TextEditingController _customSportController = TextEditingController();
+
+  final List<String> _standardSports = const [
+    'FOOTBALL',
+    'BASKETBALL',
+    'BASEBALL',
+    'SOCCER',
+    'TRACK',
+    'VOLLEYBALL',
+  ];
+
+  /// Dropdown value (one of [_standardSports] or [_kOtherCustom]).
+  String _sportDropdownValue = 'FOOTBALL';
+
   List<String> positionGroups = ['OFFENSE', 'DEFENSE', 'SPECIAL TEAMS'];
   List<String> selectedPositionGroups = ['OFFENSE', 'DEFENSE'];
   
@@ -43,6 +56,20 @@ class _CreateTeamViewState extends State<CreateTeamView> {
   bool isLoading = false;
   File? _selectedLogo;
   final ImagePicker _picker = ImagePicker();
+
+  String _resolvedSport() {
+    if (_sportDropdownValue == _kOtherCustom) {
+      return _customSportController.text.trim();
+    }
+    return _sportDropdownValue;
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _customSportController.dispose();
+    super.dispose();
+  }
 
   Future<void> _pickLogo() async {
     try {
@@ -119,6 +146,17 @@ class _CreateTeamViewState extends State<CreateTeamView> {
       return;
     }
 
+    final sportLabel = _resolvedSport();
+    if (sportLabel.isEmpty) {
+      Get.snackbar(
+        'Error',
+        _sportDropdownValue == _kOtherCustom
+            ? 'Please enter a custom sport or group name'
+            : 'Please select a sport',
+      );
+      return;
+    }
+
     setState(() => isLoading = true);
 
     try {
@@ -131,6 +169,7 @@ class _CreateTeamViewState extends State<CreateTeamView> {
         schoolId: schoolId,
         name: _nameController.text.trim(),
         teamCode: '',
+        sport: sportLabel,
         positionGroups: selectedPositionGroups.toList(),
         customTags: const [],
         primaryColor: '#${primaryColor.value.toRadixString(16).substring(2).toUpperCase()}',
@@ -175,7 +214,8 @@ class _CreateTeamViewState extends State<CreateTeamView> {
     showGeneralDialog(
       context: context,
       barrierDismissible: false,
-      barrierColor: Colors.transparent,
+      // Add an opaque scrim so the success dialog reads clearly over video/bg.
+      barrierColor: Colors.black54,
       transitionDuration: const Duration(milliseconds: 400),
       pageBuilder: (context, anim1, anim2) {
         return Scaffold(
@@ -185,95 +225,133 @@ class _CreateTeamViewState extends State<CreateTeamView> {
               child: Center(
                 child: SingleChildScrollView(
                   padding: const EdgeInsets.all(24.0),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // ── Header ──────────────────────────────────────────
-                      Icon(Icons.emoji_events, color: AppColors.tierGold, size: 72)
-                        .animate(onPlay: (c) => c.repeat())
-                        .shimmer(duration: 1500.ms, color: Colors.white),
-                      const SizedBox(height: 16),
-                      Text(
-                        'TEAM CREATED!',
-                        style: GoogleFonts.spaceGrotesk(
-                          fontSize: 28, fontWeight: FontWeight.w900,
-                          color: AppColors.tierGold, letterSpacing: 3,
+                  child: Material(
+                    color: const Color(0xFF101A24),
+                    elevation: 18,
+                    shadowColor: Colors.black.withValues(alpha: 0.55),
+                    borderRadius: BorderRadius.circular(28),
+                    child: Container(
+                      width: double.infinity,
+                      constraints: const BoxConstraints(maxWidth: 520),
+                      padding: const EdgeInsets.fromLTRB(22, 22, 22, 20),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(28),
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.08),
                         ),
                       ),
-                      const SizedBox(height: 6),
-                      Text(
-                        teamName,
-                        style: GoogleFonts.inter(
-                          fontSize: 16, color: Colors.white70, fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      const SizedBox(height: 32),
-
-                      // ── Invite Code Card ─────────────────────────────────
-                      GlassCard(
-                        backgroundColor: const Color(0x99172A36),
-                        leftBorderColor: AppColors.tierGold,
-                        padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 28),
-                        child: Column(
-                          children: [
-                            Text(
-                              'PLAYER INVITE CODE',
-                              style: GoogleFonts.spaceGrotesk(
-                                fontSize: 11, color: Colors.white54,
-                                letterSpacing: 2.0, fontWeight: FontWeight.w700,
-                              ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // ── Header ──────────────────────────────────────────
+                          Icon(Icons.emoji_events,
+                                  color: AppColors.tierGold, size: 72)
+                              .animate(onPlay: (c) => c.repeat())
+                              .shimmer(duration: 1500.ms, color: Colors.white),
+                          const SizedBox(height: 16),
+                          Text(
+                            'TEAM CREATED!',
+                            style: GoogleFonts.spaceGrotesk(
+                              fontSize: 28,
+                              fontWeight: FontWeight.w900,
+                              color: AppColors.tierGold,
+                              letterSpacing: 3,
                             ),
-                            const SizedBox(height: 12),
-                            Text(
-                              code,
-                              style: GoogleFonts.spaceGrotesk(
-                                fontSize: 52, fontWeight: FontWeight.w900,
-                                color: AppColors.tierGold, letterSpacing: 10,
-                                shadows: [
-                                  Shadow(
-                                    color: AppColors.tierGold.withValues(alpha: 0.4),
-                                    blurRadius: 20,
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            teamName,
+                            textAlign: TextAlign.center,
+                            style: GoogleFonts.inter(
+                              fontSize: 16,
+                              color: Colors.white70,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          const SizedBox(height: 26),
+
+                          // ── Invite Code Card ─────────────────────────────────
+                          GlassCard(
+                            backgroundColor: const Color(0xFF172A36),
+                            leftBorderColor: AppColors.tierGold,
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 28, vertical: 28),
+                            child: Column(
+                              children: [
+                                Text(
+                                  'PLAYER INVITE CODE',
+                                  style: GoogleFonts.spaceGrotesk(
+                                    fontSize: 11,
+                                    color: Colors.white54,
+                                    letterSpacing: 2.0,
+                                    fontWeight: FontWeight.w700,
                                   ),
-                                ],
-                              ),
-                            ).animate().scale(
-                              begin: const Offset(0.5, 0.5),
-                              duration: 600.ms,
-                              curve: Curves.elasticOut,
+                                ),
+                                const SizedBox(height: 12),
+                                Text(
+                                  code,
+                                  style: GoogleFonts.spaceGrotesk(
+                                    fontSize: 52,
+                                    fontWeight: FontWeight.w900,
+                                    color: AppColors.tierGold,
+                                    letterSpacing: 10,
+                                    shadows: [
+                                      Shadow(
+                                        color: AppColors.tierGold.withValues(
+                                            alpha: 0.35),
+                                        blurRadius: 18,
+                                      ),
+                                    ],
+                                  ),
+                                ).animate().scale(
+                                      begin: const Offset(0.5, 0.5),
+                                      duration: 600.ms,
+                                      curve: Curves.elasticOut,
+                                    ),
+                                const SizedBox(height: 12),
+                                Text(
+                                  'Share this code with your athletes to join the team.',
+                                  textAlign: TextAlign.center,
+                                  style: GoogleFonts.inter(
+                                    fontSize: 12,
+                                    color: Colors.white38,
+                                    height: 1.5,
+                                  ),
+                                ),
+                              ],
                             ),
-                            const SizedBox(height: 12),
-                            Text(
-                              'Share this code with your athletes to join the team.',
-                              textAlign: TextAlign.center,
-                              style: GoogleFonts.inter(
-                                fontSize: 12, color: Colors.white38, height: 1.5,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ).animate().fade().slideY(begin: 0.15, curve: Curves.easeOutCubic),
+                          ).animate().fade().slideY(
+                              begin: 0.15, curve: Curves.easeOutCubic),
 
-                      const SizedBox(height: 24),
+                          const SizedBox(height: 22),
 
-                      // ── Actions ───────────────────────────────────────────
-                      _buildActionButton('COPY CODE', Icons.copy, () {
-                        Clipboard.setData(ClipboardData(text: code));
-                        Get.snackbar(
-                          'Copied!', 'Invite code copied to clipboard',
-                          backgroundColor: AppColors.tierGold,
-                          colorText: Colors.black,
-                          snackPosition: SnackPosition.BOTTOM,
-                          margin: const EdgeInsets.all(16),
-                        );
-                      }),
-                      const SizedBox(height: 14),
-                      _buildActionButton('GO TO DASHBOARD', Icons.arrow_forward, () {
-                        // When coach had no teams we used offAllNamed(CREATE_TEAM), so
-                        // COACH is not on the stack. Navigate to coach dashboard explicitly.
-                        Navigator.of(context).pop(); // close success overlay
-                        Get.offAllNamed(Routes.COACH);
-                      }, isPrimary: true),
-                    ],
+                          // ── Actions ───────────────────────────────────────────
+                          _buildActionButton('COPY CODE', Icons.copy, () {
+                            Clipboard.setData(ClipboardData(text: code));
+                            Get.snackbar(
+                              'Copied!',
+                              'Invite code copied to clipboard',
+                              backgroundColor: AppColors.tierGold,
+                              colorText: Colors.black,
+                              snackPosition: SnackPosition.BOTTOM,
+                              margin: const EdgeInsets.all(16),
+                            );
+                          }),
+                          const SizedBox(height: 14),
+                          _buildActionButton(
+                            'GO TO DASHBOARD',
+                            Icons.arrow_forward,
+                            () {
+                              // When coach had no teams we used offAllNamed(CREATE_TEAM), so
+                              // COACH is not on the stack. Navigate to coach dashboard explicitly.
+                              Navigator.of(context).pop(); // close success overlay
+                              Get.offAllNamed(Routes.COACH);
+                            },
+                            isPrimary: true,
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -319,9 +397,13 @@ class _CreateTeamViewState extends State<CreateTeamView> {
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: StadiumBackground(
-        child: SafeArea(
-          child: Column(
-            children: [
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            // const FireSparksBackground(),
+            SafeArea(
+              child: Column(
+                children: [
               // Custom App Bar
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
@@ -430,42 +512,51 @@ class _CreateTeamViewState extends State<CreateTeamView> {
                                     return Stack(
                                       clipBehavior: Clip.none,
                                       children: [
-                                        Container(
-                                          width: 100,
-                                          height: 100,
-                                          decoration: BoxDecoration(
-                                            shape: BoxShape.circle,
-                                            color: Colors.white.withOpacity(0.07),
-                                            border: Border.all(
-                                              color: primaryColor.withOpacity(0.6),
-                                              width: 2.5,
+                                        AnimatedGlowingBorder(
+                                          // Preserve strict sizing: original 100x100 logo circle.
+                                          // Add clean 3px glow gap around it.
+                                          diameter: 106,
+                                          borderWidth: 3,
+                                          duration: const Duration(seconds: 4),
+                                          child: SizedBox(
+                                            width: 100,
+                                            height: 100,
+                                            child: Container(
+                                              decoration: BoxDecoration(
+                                                shape: BoxShape.circle,
+                                                color: Colors.white.withOpacity(0.07),
+                                                border: Border.all(
+                                                  color: primaryColor.withOpacity(0.6),
+                                                  width: 2.5,
+                                                ),
+                                                image: _selectedLogo != null
+                                                    ? DecorationImage(
+                                                        image: FileImage(_selectedLogo!),
+                                                        fit: BoxFit.cover,
+                                                      )
+                                                    : null,
+                                              ),
+                                              child: _selectedLogo == null
+                                                  ? Column(
+                                                      mainAxisAlignment: MainAxisAlignment.center,
+                                                      children: [
+                                                        Icon(Icons.shield_outlined,
+                                                            color: primaryColor.withOpacity(0.6),
+                                                            size: 32),
+                                                        const SizedBox(height: 4),
+                                                        Text(
+                                                          'Add Logo',
+                                                          style: GoogleFonts.spaceGrotesk(
+                                                            color: Colors.white38,
+                                                            fontSize: 10,
+                                                            fontWeight: FontWeight.w600,
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    )
+                                                  : null,
                                             ),
-                                            image: _selectedLogo != null
-                                                ? DecorationImage(
-                                                    image: FileImage(_selectedLogo!),
-                                                    fit: BoxFit.cover,
-                                                  )
-                                                : null,
                                           ),
-                                          child: _selectedLogo == null
-                                              ? Column(
-                                                  mainAxisAlignment: MainAxisAlignment.center,
-                                                  children: [
-                                                    Icon(Icons.shield_outlined,
-                                                        color: primaryColor.withOpacity(0.6),
-                                                        size: 32),
-                                                    const SizedBox(height: 4),
-                                                    Text(
-                                                      'Add Logo',
-                                                      style: GoogleFonts.spaceGrotesk(
-                                                        color: Colors.white38,
-                                                        fontSize: 10,
-                                                        fontWeight: FontWeight.w600,
-                                                      ),
-                                                    ),
-                                                  ],
-                                                )
-                                              : null,
                                         ),
                                         Positioned(
                                           bottom: 0,
@@ -527,33 +618,81 @@ class _CreateTeamViewState extends State<CreateTeamView> {
                             Text('SPORT', style: GoogleFonts.spaceGrotesk(color: Colors.white54, fontSize: 10, letterSpacing: 1.5, fontWeight: FontWeight.bold))
                                 .animate(delay: 450.ms).fade(duration: 800.ms, curve: Curves.easeOutQuint),
                             const SizedBox(height: 8),
-                            SingleChildScrollView(
-                              scrollDirection: Axis.horizontal,
-                              physics: const BouncingScrollPhysics(),
-                              child: Row(
-                                children: sports.map((sport) {
-                                  final isSelected = selectedSport == sport;
-                                  return GestureDetector(
-                                    onTap: () => setState(() => selectedSport = sport),
-                                    child: Container(
-                                      margin: const EdgeInsets.only(right: 12),
-                                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                                      decoration: BoxDecoration(
-                                        color: isSelected ? AppColors.primary : Colors.white.withOpacity(0.1),
-                                        borderRadius: BorderRadius.circular(24),
-                                      ),
+                            Container(
+                              decoration: BoxDecoration(
+                                color: const Color(0x800A0E1A),
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+                              ),
+                              padding: const EdgeInsets.symmetric(horizontal: 4),
+                              child: DropdownButtonFormField<String>(
+                                value: _sportDropdownValue,
+                                isExpanded: true,
+                                dropdownColor: const Color(0xFF172A36),
+                                borderRadius: BorderRadius.circular(16),
+                                icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Colors.white70),
+                                style: GoogleFonts.inter(color: Colors.white, fontSize: 16),
+                                decoration: const InputDecoration(
+                                  border: InputBorder.none,
+                                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                                  isDense: true,
+                                ),
+                                hint: Text(
+                                  'Select sport',
+                                  style: GoogleFonts.inter(color: Colors.white38, fontSize: 16),
+                                ),
+                                items: [
+                                  ..._standardSports.map(
+                                    (s) => DropdownMenuItem<String>(
+                                      value: s,
                                       child: Text(
-                                        sport,
-                                        style: GoogleFonts.spaceGrotesk(
-                                          color: isSelected ? Colors.white : Colors.white54,
-                                          fontSize: 12, fontWeight: FontWeight.bold,
-                                        ),
+                                        s,
+                                        style: GoogleFonts.inter(color: Colors.white, fontSize: 16),
                                       ),
                                     ),
-                                  );
-                                }).toList(),
+                                  ),
+                                  DropdownMenuItem<String>(
+                                    value: _kOtherCustom,
+                                    child: Text(
+                                      'Other / Custom',
+                                      style: GoogleFonts.inter(
+                                        color: const Color(0xFFFFB74D),
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                                onChanged: (v) {
+                                  if (v == null) return;
+                                  setState(() => _sportDropdownValue = v);
+                                },
                               ),
                             ).animate(delay: 500.ms).fade(duration: 800.ms, curve: Curves.easeOutQuint).slideY(begin: 0.1, curve: Curves.easeOutQuint).blurXY(begin: 4, end: 0, duration: 800.ms),
+                            if (_sportDropdownValue == _kOtherCustom) ...[
+                              const SizedBox(height: 12),
+                              Container(
+                                decoration: BoxDecoration(
+                                  color: const Color(0x800A0E1A),
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(
+                                    color: AppColors.primary.withValues(alpha: 0.35),
+                                  ),
+                                ),
+                                child: TextField(
+                                  controller: _customSportController,
+                                  onChanged: (_) => setState(() {}),
+                                  style: GoogleFonts.inter(color: Colors.white, fontSize: 16),
+                                  textCapitalization: TextCapitalization.words,
+                                  decoration: InputDecoration(
+                                    hintText: 'e.g. Multi-Sport, Varsity Group',
+                                    hintStyle: GoogleFonts.inter(color: Colors.white24),
+                                    border: InputBorder.none,
+                                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                                  ),
+                                ),
+                              ).animate(delay: 520.ms).fade(duration: 800.ms, curve: Curves.easeOutQuint).slideY(begin: 0.08, curve: Curves.easeOutQuint),
+                            ],
 
                             const SizedBox(height: 32),
 
@@ -697,8 +836,10 @@ class _CreateTeamViewState extends State<CreateTeamView> {
                   ),
                 ),
               ),
-            ],
-          ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );

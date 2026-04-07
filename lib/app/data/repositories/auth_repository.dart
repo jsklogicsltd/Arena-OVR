@@ -23,10 +23,6 @@ class AuthRepository {
     await _provider.auth.sendPasswordResetEmail(email: email);
   }
 
-  Future<void> deleteAccount() async {
-    await _provider.auth.currentUser?.delete();
-  }
-
   User? getCurrentUser() {
     return _provider.auth.currentUser;
   }

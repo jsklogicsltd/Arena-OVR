@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
@@ -9,20 +8,44 @@ import '../../core/widgets/stadium_background.dart';
 import '../../core/widgets/glass_card.dart';
 import '../../core/widgets/glass_text_field.dart';
 import '../../core/widgets/arena_button.dart';
+import '../../core/widgets/fire_sparks_background.dart';
+import '../../core/components/animated_glowing_border.dart';
 import 'admin_controller.dart';
 
-class CreateSchoolView extends GetView<AdminController> {
+class CreateSchoolView extends StatefulWidget {
   const CreateSchoolView({super.key});
+
+  @override
+  State<CreateSchoolView> createState() => _CreateSchoolViewState();
+}
+
+class _CreateSchoolViewState extends State<CreateSchoolView> {
+  final AdminController controller = Get.find<AdminController>();
+  bool _didReset = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_didReset) return;
+    _didReset = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      controller.resetCreateSchoolFlow();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: StadiumBackground(
-        child: SafeArea(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            // const FireSparksBackground(),
+            SafeArea(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
               // Top Bar
               Padding(
                 padding: const EdgeInsets.all(24.0),
@@ -44,7 +67,10 @@ class CreateSchoolView extends GetView<AdminController> {
                             Icons.arrow_back,
                             color: Colors.white,
                           ),
-                          onPressed: () => Get.back(),
+                          onPressed: () {
+                            controller.resetCreateSchoolFlow();
+                            Get.back();
+                          },
                         ),
                       ),
                     ),
@@ -78,42 +104,42 @@ class CreateSchoolView extends GetView<AdminController> {
                               child: GestureDetector(
                                 onTap: controller.pickSchoolLogo,
                                 child: Obx(
-                                  () => Container(
-                                    width: 100,
-                                    height: 100,
-                                    decoration: BoxDecoration(
-                                      color: Colors.white.withValues(
-                                        alpha: 0.05,
+                                  () {
+                                    final file = controller.selectedSchoolLogo.value;
+                                    // Preserve strict sizing: original 100x100.
+                                    // Add clean 3px glow gap around it.
+                                    return AnimatedGlowingBorder(
+                                      diameter: 106,
+                                      borderWidth: 3,
+                                      duration: const Duration(seconds: 4),
+                                      child: SizedBox(
+                                        width: 100,
+                                        height: 100,
+                                        child: Container(
+                                          decoration: BoxDecoration(
+                                            color: Colors.white.withValues(alpha: 0.05),
+                                            shape: BoxShape.circle,
+                                            border: Border.all(
+                                              color: const Color(0xFF00A1FF).withValues(alpha: 0.5),
+                                            ),
+                                            image: file != null
+                                                ? DecorationImage(
+                                                    image: FileImage(file),
+                                                    fit: BoxFit.cover,
+                                                  )
+                                                : null,
+                                          ),
+                                          child: file == null
+                                              ? const Icon(
+                                                  Icons.add_a_photo,
+                                                  color: Colors.white54,
+                                                  size: 32,
+                                                )
+                                              : null,
+                                        ),
                                       ),
-                                      shape: BoxShape.circle,
-                                      border: Border.all(
-                                        color: const Color(
-                                          0xFF00A1FF,
-                                        ).withValues(alpha: 0.5),
-                                      ),
-                                      image:
-                                          controller.selectedSchoolLogo.value !=
-                                              null
-                                          ? DecorationImage(
-                                              image: FileImage(
-                                                controller
-                                                    .selectedSchoolLogo
-                                                    .value!,
-                                              ),
-                                              fit: BoxFit.cover,
-                                            )
-                                          : null,
-                                    ),
-                                    child:
-                                        controller.selectedSchoolLogo.value ==
-                                            null
-                                        ? const Icon(
-                                            Icons.add_a_photo,
-                                            color: Colors.white54,
-                                            size: 32,
-                                          )
-                                        : null,
-                                  ),
+                                    );
+                                  },
                                 ),
                               ),
                             ),
@@ -375,6 +401,7 @@ class CreateSchoolView extends GetView<AdminController> {
                               ArenaButton(
                                 label: 'DONE',
                                 onPressed: () {
+                                  controller.resetCreateSchoolFlow();
                                   Get.back();
                                 },
                               ).animate().fade().slideY(begin: 0.2),
@@ -410,8 +437,10 @@ class CreateSchoolView extends GetView<AdminController> {
                   ),
                 ),
               ),
-            ],
-          ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );

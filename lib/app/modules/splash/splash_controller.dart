@@ -1,6 +1,7 @@
 import 'package:get/get.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../data/models/user_model.dart';
 import '../../routes/app_routes.dart';
 
 class SplashController extends GetxController {
@@ -25,7 +26,7 @@ class SplashController extends GetxController {
 
           if (role == 'superadmin') {
             Get.offAllNamed(Routes.ADMIN);
-          } else if (role == 'coach') {
+          } else if (UserModel.isCoachRole(role)) {
             if (schoolId == null || schoolId.isEmpty) {
               Get.offAllNamed(Routes.INVITE_CODE);
             } else {

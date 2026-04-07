@@ -59,7 +59,9 @@ class TeamRepository {
     };
 
     final batch = _provider.firestore.batch();
-    batch.set(newTeamRef, teamWithCode.toJson());
+    final teamJson = teamWithCode.toJson();
+    teamJson['coachIds'] = [team.createdBy];
+    batch.set(newTeamRef, teamJson);
     batch.set(newSeasonRef, seasonData);
     
     final coachRef = _provider.firestore.collection('users').doc(team.createdBy);
@@ -92,18 +94,59 @@ class TeamRepository {
     await _provider.firestore.collection('teams').doc(teamId).update(updates);
   }
 
+  /// Single-document payload for an athlete when starting a new season.
+  /// Must stay aligned with [CoachController.submitBulkAssessments] / manual entry
+  /// (`assessmentData` map: squat, bench_press, 40_yard_dash, gpa, powerNumber, …).
+  static Map<String, dynamic> _athleteSeasonResetUpdates() {
+    return {
+      // Manual OVR must reset to the base starting value (50), not 0.
+      'ovr': 50,
+      'actualOvr': 50,
+      'ovrDay': null,
+      'ovrCap': null,
+      'currentRating': <String, dynamic>{},
+      'currentStreak': <String, dynamic>{},
+      'automatedOvr': 0,
+      // Wipe the full assessment blob written by the Award → Assessments tab.
+      'assessmentData': <String, dynamic>{},
+      // Legacy / alternate top-level keys (defensive).
+      'assessments': FieldValue.delete(),
+      'assessment': FieldValue.delete(),
+      'assessmentRaw': FieldValue.delete(),
+      'assessmentMetrics': FieldValue.delete(),
+      'bodyweight': FieldValue.delete(),
+      'squat': FieldValue.delete(),
+      'bench': FieldValue.delete(),
+      'bench_press': FieldValue.delete(),
+      'dash40': FieldValue.delete(),
+      '40_yard_dash': FieldValue.delete(),
+      'gpa': FieldValue.delete(),
+    };
+  }
+
   Future<void> resetSeason(String teamId) async {
     final teamDoc = await _provider.firestore.collection('teams').doc(teamId).get();
     if (!teamDoc.exists) return;
 
     final teamData = teamDoc.data()!;
     final currentSeasonId = teamData['currentSeasonId'];
-    
-    final batch = _provider.firestore.batch();
+    // Firestore WriteBatch limit is 500 ops. This reset can touch many docs, so we
+    // commit in chunks to avoid limit failures while still keeping operations tight.
+    WriteBatch batch = _provider.firestore.batch();
+    int ops = 0;
+    Future<void> flushIfNeeded() async {
+      if (ops >= 450) {
+        await batch.commit();
+        batch = _provider.firestore.batch();
+        ops = 0;
+      }
+    }
     
     if (currentSeasonId != null) {
       final currentSeasonRef = _provider.firestore.collection('seasons').doc(currentSeasonId);
       batch.update(currentSeasonRef, {'isActive': false, 'endDate': FieldValue.serverTimestamp()});
+      ops++;
+      await flushIfNeeded();
       
       final txSnapshot = await _provider.firestore.collection('transactions')
           .where('teamId', isEqualTo: teamId)
@@ -113,6 +156,8 @@ class TeamRepository {
           
       for (var doc in txSnapshot.docs) {
         batch.update(doc.reference, {'isArchived': true});
+        ops++;
+        await flushIfNeeded();
       }
     }
 
@@ -130,28 +175,30 @@ class TeamRepository {
       'endDate': Timestamp.fromDate(newStart.add(const Duration(days: 14))),
       'isActive': true,
     });
+    ops++;
+    await flushIfNeeded();
 
     batch.update(_provider.firestore.collection('teams').doc(teamId), {
       'currentSeasonId': newSeasonRef.id,
     });
+    ops++;
+    await flushIfNeeded();
 
     final athletesSnap = await _provider.firestore.collection('users')
         .where('teamId', isEqualTo: teamId)
         .where('role', isEqualTo: 'athlete')
         .get();
         
+    final athletePayload = _athleteSeasonResetUpdates();
     for (var doc in athletesSnap.docs) {
-      batch.update(doc.reference, {
-        'ovr': 0,
-        'actualOvr': null,
-        'ovrDay': null,
-        'ovrCap': null,
-        'currentRating': {},
-        'currentStreak': {}
-      });
+      batch.update(doc.reference, athletePayload);
+      ops++;
+      await flushIfNeeded();
     }
 
-    await batch.commit();
+    if (ops > 0) {
+      await batch.commit();
+    }
   }
 
   /// Stream team athletes sorted by OVR descending. Used for leaderboard.

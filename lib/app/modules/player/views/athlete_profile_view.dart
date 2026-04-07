@@ -4,14 +4,14 @@ import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 
 import '../player_controller.dart';
 import '../../coach/coach_controller.dart';
 import '../../leaderboard/leaderboard_controller.dart';
 import '../../../core/constants/app_colors.dart';
-import '../../../core/constants/app_assets.dart';
+import '../../../core/widgets/fire_sparks_background.dart';
+import '../../../core/widgets/periodic_shimmer_bar.dart';
 import '../../../data/models/user_model.dart';
 import '../../../data/models/transaction_model.dart';
 import '../../../data/repositories/rating_repository.dart';
@@ -32,14 +32,12 @@ class _AthleteProfileViewState extends State<AthleteProfileView>
     with TickerProviderStateMixin {
   late AnimationController _barsCtrl;
   late AnimationController _cardCtrl;
-  late Animation<double> _perfAnim, _classAnim, _progAnim, _stdAnim;
+  late Animation<double> _athAnim, _stuAnim, _tmAnim, _citAnim;
 
   UserModel?                    _athlete;
   List<TransactionModel>        _history = [];
   bool                          _historyLoading = false;
   bool                          _isCoachView = false;
-  String?                       _teamId;
-  String?                       _seasonId;
 
   @override
   void initState() {
@@ -72,8 +70,6 @@ class _AthleteProfileViewState extends State<AthleteProfileView>
       final args   = Get.arguments as Map<String, dynamic>? ?? {};
       _athlete     = args['athlete'] as UserModel?;
       _isCoachView = args['isCoachView'] as bool? ?? false;
-      _teamId      = args['teamId']    as String?;
-      _seasonId    = args['seasonId']  as String?;
       _history     = _staticHistory;
       if (_athlete != null) _fetchHistory(_athlete!.uid);
       else _historyLoading = false;
@@ -83,19 +79,19 @@ class _AthleteProfileViewState extends State<AthleteProfileView>
 
   void _setupBarAnims(UserModel a) {
     const maxScore = 100.0;
-    final r    = a.currentRating;
-    final perf = ((r['Performance'] ?? 0) as num).toDouble();
-    final cls  = ((r['Class']       ?? 0) as num).toDouble();
-    final prog = ((r['Program']     ?? 0) as num).toDouble();
-    final std  = ((r['Standard']    ?? 0) as num).toDouble();
+    final r   = a.currentRating;
+    final ath = ((r['Athlete']  ?? r['Performance'] ?? 0) as num).toDouble();
+    final stu = ((r['Student']  ?? r['Class']       ?? 0) as num).toDouble();
+    final tm  = ((r['Teammate'] ?? r['Program']     ?? 0) as num).toDouble();
+    final cit = ((r['Citizen']  ?? r['Standard']    ?? 0) as num).toDouble();
 
-    _perfAnim  = Tween<double>(begin: 0, end: (perf / maxScore).clamp(0.0, 1.0)).animate(
+    _athAnim = Tween<double>(begin: 0, end: (ath / maxScore).clamp(0.0, 1.0)).animate(
         CurvedAnimation(parent: _barsCtrl, curve: const Interval(0.00, 0.75, curve: Curves.easeOut)));
-    _classAnim = Tween<double>(begin: 0, end: (cls  / maxScore).clamp(0.0, 1.0)).animate(
+    _stuAnim = Tween<double>(begin: 0, end: (stu / maxScore).clamp(0.0, 1.0)).animate(
         CurvedAnimation(parent: _barsCtrl, curve: const Interval(0.12, 0.82, curve: Curves.easeOut)));
-    _progAnim  = Tween<double>(begin: 0, end: (prog / maxScore).clamp(0.0, 1.0)).animate(
+    _tmAnim  = Tween<double>(begin: 0, end: (tm  / maxScore).clamp(0.0, 1.0)).animate(
         CurvedAnimation(parent: _barsCtrl, curve: const Interval(0.24, 0.90, curve: Curves.easeOut)));
-    _stdAnim   = Tween<double>(begin: 0, end: (std  / maxScore).clamp(0.0, 1.0)).animate(
+    _citAnim = Tween<double>(begin: 0, end: (cit / maxScore).clamp(0.0, 1.0)).animate(
         CurvedAnimation(parent: _barsCtrl, curve: const Interval(0.36, 1.00, curve: Curves.easeOut)));
   }
 
@@ -148,20 +144,10 @@ class _AthleteProfileViewState extends State<AthleteProfileView>
 
   Widget _buildScaffold({PlayerController? c}) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0A0E1A),
+      backgroundColor: Colors.transparent,
       body: Stack(
         children: [
-          Opacity(
-            opacity: 0.35,
-            child: Container(
-              decoration: const BoxDecoration(
-                image: DecorationImage(
-                  image: AssetImage(AppAssets.background),
-                  fit: BoxFit.cover,
-                ),
-              ),
-            ),
-          ),
+          // const FireSparksBackground(),
           Positioned(
             bottom: 0, left: 0, right: 0, height: 280,
             child: Container(
@@ -192,10 +178,10 @@ class _AthleteProfileViewState extends State<AthleteProfileView>
   Widget _buildBody(PlayerController? c) {
     final athlete = _athlete!;
     final r       = athlete.currentRating;
-    final perf    = ((r['Performance'] ?? 0) as num).toInt();
-    final cls     = ((r['Class']       ?? 0) as num).toInt();
-    final prog    = ((r['Program']     ?? 0) as num).toInt();
-    final std     = ((r['Standard']    ?? 0) as num).toInt();
+    final ath     = ((r['Athlete']  ?? r['Performance'] ?? 0) as num).toInt();
+    final stu     = ((r['Student']  ?? r['Class']       ?? 0) as num).toInt();
+    final tm      = ((r['Teammate'] ?? r['Program']     ?? 0) as num).toInt();
+    final cit     = ((r['Citizen']  ?? r['Standard']    ?? 0) as num).toInt();
 
     return CustomScrollView(
       physics: const BouncingScrollPhysics(),
@@ -245,8 +231,8 @@ class _AthleteProfileViewState extends State<AthleteProfileView>
               AnimatedBuilder(
                 animation: _barsCtrl,
                 builder: (_, __) => _buildCategoryBars(
-                  perf, cls, prog, std,
-                  _perfAnim.value, _classAnim.value, _progAnim.value, _stdAnim.value,
+                  ath, stu, tm, cit,
+                  _athAnim.value, _stuAnim.value, _tmAnim.value, _citAnim.value,
                 ),
               ).animate(delay: 250.ms).fade(duration: 400.ms).slideY(begin: 0.1),
               const SizedBox(height: 28),
@@ -522,19 +508,26 @@ class _AthleteProfileViewState extends State<AthleteProfileView>
           ),
         ),
         const SizedBox(height: 6),
-        if (athlete.jerseyNumber != null || athlete.positionGroup != null)
-          Text(
-            [
-              if (athlete.jerseyNumber != null) '#${athlete.jerseyNumber}',
-              if (athlete.positionGroup != null) athlete.positionGroup!,
-              'Offense',
-            ].join(' • '),
-            style: GoogleFonts.inter(
-              color: AppColors.primary,
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
+        Builder(
+          builder: (_) {
+            final pos = (athlete.positionGroup ?? '').trim();
+            final rawJersey = (athlete.jerseyNumber ?? '').trim();
+            final hasJerseyField =
+                rawJersey.isNotEmpty && rawJersey.toLowerCase() != 'null';
+            if (!hasJerseyField && pos.isEmpty) return const SizedBox.shrink();
+            return Text(
+              [
+                '#${athlete.displayJerseyNumber}',
+                if (pos.isNotEmpty) pos,
+              ].join(' • '),
+              style: GoogleFonts.inter(
+                color: AppColors.primary,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            );
+          },
+        ),
         const SizedBox(height: 8),
         // Team name — same as Player Settings: TEAM label + team name
         Row(
@@ -642,19 +635,19 @@ class _AthleteProfileViewState extends State<AthleteProfileView>
   //                blur=12, gap=8 (between cards). Labels: PERFORMANCE, TEAMMATE, IMPACT, THE STANDARD.
 
   Widget _buildCategoryBars(
-    int perf, int cls, int prog, int std,
-    double perfPct, double clsPct, double progPct, double stdPct,
+    int ath, int stu, int tm, int cit,
+    double athPct, double stuPct, double tmPct, double citPct,
   ) {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        _buildStatCard('PERFORMANCE', perf, perfPct, AppColors.primary),
+        _buildStatCard('ATHLETE',   ath, athPct, AppColors.primary),
         const SizedBox(height: 8),
-        _buildStatCard('CLASSROOM',   cls,  clsPct,  AppColors.positive),
+        _buildStatCard('STUDENT',   stu, stuPct, AppColors.positive),
         const SizedBox(height: 8),
-        _buildStatCard('PROGRAM',     prog, progPct, const Color(0xFF9B30FF)),
+        _buildStatCard('TEAMMATE',  tm,  tmPct,  const Color(0xFF9B30FF)),
         const SizedBox(height: 8),
-        _buildStatCard('STANDARD',   std,  stdPct,  const Color(0xFFFF9500)),
+        _buildStatCard('CITIZEN',   cit, citPct, const Color(0xFFFF9500)),
       ],
     );
   }
@@ -707,13 +700,17 @@ class _AthleteProfileViewState extends State<AthleteProfileView>
                 ],
               ),
               const SizedBox(height: 8),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: LinearProgressIndicator(
-                  value: pct,
-                  backgroundColor: Colors.white.withOpacity(0.06),
-                  valueColor: AlwaysStoppedAnimation<Color>(color),
-                  minHeight: 6,
+              PeriodicShimmerBar(
+                baseColor: color,
+                shimmerFraction: pct.clamp(0.0, 1.0),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: LinearProgressIndicator(
+                    value: pct,
+                    backgroundColor: Colors.white.withOpacity(0.06),
+                    valueColor: AlwaysStoppedAnimation<Color>(color),
+                    minHeight: 6,
+                  ),
                 ),
               ),
             ],
@@ -973,24 +970,18 @@ class _AthleteProfileViewState extends State<AthleteProfileView>
         .fold<int>(0, (sum, t) => sum + t.value);
   }
 
-  Color _catColor(String cat) {
-    switch (cat.toLowerCase()) {
-      case 'performance': return AppColors.primary;
-      case 'class':
-      case 'classroom':   return AppColors.positive;
-      case 'program':     return const Color(0xFF9B30FF);
-      case 'standard':    return AppColors.tierGold;
-      default:            return AppColors.textSecondary;
-    }
-  }
-
   String _catDisplay(String cat) {
     switch (cat.toLowerCase()) {
+      case 'athlete':
+      case 'performance': return 'Athlete';
+      case 'student':
       case 'class':
-      case 'classroom': return 'Classroom';
-      case 'program':   return 'Program';
-      case 'standard':  return 'The Standard';
-      default:          return cat;
+      case 'classroom':   return 'Student';
+      case 'teammate':
+      case 'program':     return 'Teammate';
+      case 'citizen':
+      case 'standard':    return 'Citizen';
+      default:            return cat;
     }
   }
 
@@ -998,7 +989,7 @@ class _AthleteProfileViewState extends State<AthleteProfileView>
     TransactionModel(
       id: '1', athleteId: uid, coachId: 'coach1',
       teamId: 'mock', schoolId: 'mock', seasonId: 'mock',
-      category: 'Performance', value: 3,
+      category: 'Athlete', value: 3,
       note: 'Exceptional drive and accuracy on the final quarter.',
       type: 'RATING',
       createdAt: DateTime(2024, 10, 4),
@@ -1006,7 +997,7 @@ class _AthleteProfileViewState extends State<AthleteProfileView>
     TransactionModel(
       id: '2', athleteId: uid, coachId: 'coach1',
       teamId: 'mock', schoolId: 'mock', seasonId: 'mock',
-      category: 'Standard', value: -1,
+      category: 'Citizen', value: -1,
       note: 'Late arrival to recovery session.',
       type: 'RATING',
       createdAt: DateTime(2024, 10, 1),
@@ -1014,7 +1005,7 @@ class _AthleteProfileViewState extends State<AthleteProfileView>
     TransactionModel(
       id: '3', athleteId: uid, coachId: 'coach1',
       teamId: 'mock', schoolId: 'mock', seasonId: 'mock',
-      category: 'Classroom', value: 2,
+      category: 'Student', value: 2,
       note: 'Great support during film review and helping teammates.',
       type: 'RATING',
       createdAt: DateTime(2024, 9, 28),
@@ -1022,7 +1013,7 @@ class _AthleteProfileViewState extends State<AthleteProfileView>
     TransactionModel(
       id: '4', athleteId: uid, coachId: 'coach1',
       teamId: 'mock', schoolId: 'mock', seasonId: 'mock',
-      category: 'Program', value: 1,
+      category: 'Teammate', value: 1,
       note: 'Consistent attendance and effort in recovery sessions.',
       type: 'RATING',
       createdAt: DateTime(2024, 9, 25),

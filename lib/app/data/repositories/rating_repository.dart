@@ -43,7 +43,7 @@ class RatingRepository {
 
     final Map<String, Map<String, double>> stats = {};
     for (var doc in athletesSnap.docs) {
-      stats[doc.id] = {'perf': 0, 'class': 0, 'prog': 0, 'std': 0, 'raw': 0};
+      stats[doc.id] = {'ath': 0, 'stu': 0, 'tm': 0, 'cit': 0, 'raw': 0};
     }
 
     for (var doc in txSnapshot.docs) {
@@ -52,30 +52,33 @@ class RatingRepository {
       if (!stats.containsKey(aId)) continue;
       
       switch (t.category.toLowerCase()) {
+        case 'athlete':
         case 'performance':
-          stats[aId]!['perf'] = stats[aId]!['perf']! + t.value;
+          stats[aId]!['ath'] = stats[aId]!['ath']! + t.value;
           break;
+        case 'student':
         case 'class':
         case 'classroom':
-          stats[aId]!['class'] = stats[aId]!['class']! + t.value;
+          stats[aId]!['stu'] = stats[aId]!['stu']! + t.value;
           break;
+        case 'teammate':
         case 'program':
-          stats[aId]!['prog'] = stats[aId]!['prog']! + t.value;
+          stats[aId]!['tm'] = stats[aId]!['tm']! + t.value;
           break;
+        case 'citizen':
         case 'standard':
-          stats[aId]!['std'] = stats[aId]!['std']! + t.value;
+          stats[aId]!['cit'] = stats[aId]!['cit']! + t.value;
           break;
         default:
-          stats[aId]!['perf'] = stats[aId]!['perf']! + t.value;
+          stats[aId]!['ath'] = stats[aId]!['ath']! + t.value;
       }
     }
 
     for (var aId in stats.keys) {
-      // Each category is capped between 0..100 as per business rules.
-      stats[aId]!['perf'] = stats[aId]!['perf']!.clamp(0.0, 100.0);
-      stats[aId]!['class'] = stats[aId]!['class']!.clamp(0.0, 100.0);
-      stats[aId]!['prog'] = stats[aId]!['prog']!.clamp(0.0, 100.0);
-      stats[aId]!['std'] = stats[aId]!['std']!.clamp(0.0, 100.0);
+      stats[aId]!['ath'] = stats[aId]!['ath']!.clamp(0.0, 100.0);
+      stats[aId]!['stu'] = stats[aId]!['stu']!.clamp(0.0, 100.0);
+      stats[aId]!['tm'] = stats[aId]!['tm']!.clamp(0.0, 100.0);
+      stats[aId]!['cit'] = stats[aId]!['cit']!.clamp(0.0, 100.0);
     }
 
     final batch = _provider.firestore.batch();
@@ -86,21 +89,20 @@ class RatingRepository {
     for (var doc in athletesSnap.docs) {
       final aId = doc.id;
 
-      final perf = stats[aId]!['perf']!;
-      final clazz = stats[aId]!['class']!;
-      final prog = stats[aId]!['prog']!;
-      final std = stats[aId]!['std']!;
+      final ath = stats[aId]!['ath']!;
+      final stu = stats[aId]!['stu']!;
+      final tm = stats[aId]!['tm']!;
+      final cit = stats[aId]!['cit']!;
 
       final result = _ovrEngine.calculateOvr(
         seasonStartDate: startDate,
-        performancePts: perf,
-        classroomPts: clazz,
-        programPts: prog,
-        standardPts: std,
+        athletePts: ath,
+        studentPts: stu,
+        teammatePts: tm,
+        citizenPts: cit,
       );
 
-      final displayedOvr = result.displayedOvr ?? 0; // Day 1 hidden -> store 0
-      // Use actualOvr for team average so coaches always see real scores.
+      final displayedOvr = result.displayedOvr ?? 0;
       totalOvr += result.actualOvr;
       ratedAthletes++;
 
@@ -110,10 +112,10 @@ class RatingRepository {
         'ovrDay': result.currentDay,
         'ovrCap': result.currentCap,
         'currentRating': {
-            'Performance': perf,
-            'Class': clazz,
-            'Program': prog,
-            'Standard': std,
+            'Athlete': ath,
+            'Student': stu,
+            'Teammate': tm,
+            'Citizen': cit,
         }
       });
     }

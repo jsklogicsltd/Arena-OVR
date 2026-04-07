@@ -4,10 +4,10 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../../core/constants/app_assets.dart';
 import '../../core/constants/app_colors.dart';
-import '../../core/widgets/stadium_background.dart';
 import '../../core/widgets/glass_card.dart';
 import '../../core/widgets/glass_text_field.dart';
 import '../../core/widgets/arena_button.dart';
+import '../../core/widgets/fire_sparks_background.dart';
 import '../../routes/app_routes.dart';
 import 'auth_controller.dart';
 
@@ -16,26 +16,31 @@ class AuthView extends GetView<AuthController> {
 
   @override
   Widget build(BuildContext context) {
-    return StadiumBackground(
-      child: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 32.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+          // Subtle premium background layer (non-interactive).
+          // const FireSparksBackground(),
+          Center(
+            child: SingleChildScrollView(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 24.0, vertical: 32.0),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
 
-              // ── Logo ─────────────────────────────────────────────────────────
-              _buildLogo(),
+                  // ── Logo ─────────────────────────────────────────────────────────
+                  _buildLogo(),
 
-              const SizedBox(height: 44),
+                  const SizedBox(height: 44),
 
-              // ── Card ─────────────────────────────────────────────────────────
-              GlassCard(
-                borderRadius: 28.0,
-                padding: const EdgeInsets.fromLTRB(28, 32, 28, 28),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
+                  // ── Card ─────────────────────────────────────────────────────────
+                  GlassCard(
+                    borderRadius: 28.0,
+                    padding: const EdgeInsets.fromLTRB(28, 32, 28, 28),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
 
                     // Title row with accent line
                     Row(
@@ -125,15 +130,23 @@ class AuthView extends GetView<AuthController> {
                       duration: 480.ms,
                       curve: Curves.easeOutBack,
                     ),
-                  ],
-                ),
-              )
-              .animate(delay: 180.ms)
-              .fade(duration: 550.ms, curve: Curves.easeOut)
-              .slideY(begin: 0.1, end: 0, duration: 550.ms, curve: Curves.easeOutCubic)
-              .blur(begin: const Offset(6, 6), end: Offset.zero, duration: 500.ms, curve: Curves.easeOut),
+                      ],
+                    ),
+                  )
+                      .animate(delay: 180.ms)
+                      .fade(duration: 550.ms, curve: Curves.easeOut)
+                      .slideY(
+                          begin: 0.1,
+                          end: 0,
+                          duration: 550.ms,
+                          curve: Curves.easeOutCubic)
+                      .blur(
+                          begin: const Offset(6, 6),
+                          end: Offset.zero,
+                          duration: 500.ms,
+                          curve: Curves.easeOut),
 
-              const SizedBox(height: 28),
+                  const SizedBox(height: 28),
 
               // ── OR divider — expands from center ─────────────────────────────
               Row(
@@ -191,21 +204,20 @@ class AuthView extends GetView<AuthController> {
 
               const SizedBox(height: 48),
 
-              // ── Footer ───────────────────────────────────────────────────────
-              Text(
-                'PRIVACY POLICY   ·   TERMS OF SERVICE',
-                style: GoogleFonts.spaceGrotesk(
-                  fontSize: 10,
-                  color: AppColors.textSecondary.withOpacity(0.5),
-                  letterSpacing: 1.2,
-                ),
-              )
-              .animate(delay: 920.ms)
-              .fade(duration: 500.ms),
-            ],
+                  // ── Footer ───────────────────────────────────────────────────────
+                  Text(
+                    'PRIVACY POLICY   ·   TERMS OF SERVICE',
+                    style: GoogleFonts.spaceGrotesk(
+                      fontSize: 10,
+                      color: AppColors.textSecondary.withOpacity(0.5),
+                      letterSpacing: 1.2,
+                    ),
+                  ).animate(delay: 920.ms).fade(duration: 500.ms),
+                ],
+              ),
+            ),
           ),
-        ),
-      ),
+        ],
     );
   }
 

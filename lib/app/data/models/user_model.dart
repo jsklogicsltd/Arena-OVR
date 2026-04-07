@@ -5,7 +5,8 @@ class UserModel {
   final String email;
   final String name;
   final String? profilePicUrl;
-  final String role; // superadmin/coach/athlete
+  /// [superadmin] | [athlete] | legacy [coach] | [Head Coach] | [Assistant Coach]
+  final String role;
   final String? schoolId;
   final String? teamId; // for athletes - single team
   final List<String> teamIds; // for coaches - all teams they manage
@@ -26,6 +27,17 @@ class UserModel {
   final Map<String, dynamic> currentStreak;
   final DateTime? createdAt;
   final DateTime? lastActiveAt;
+
+  // Scoring engine physical attributes
+  final int? grade;
+  final int? heightInches;
+  final int? weightLbs;
+  final String? powerProfile;
+  final String? speedProfile;
+
+  // Automated assessment results
+  final int? automatedOvr;
+  final Map<String, dynamic>? assessmentData;
 
   UserModel({
     required this.uid,
@@ -53,10 +65,69 @@ class UserModel {
     this.currentStreak = const {},
     this.createdAt,
     this.lastActiveAt,
+    this.grade,
+    this.heightInches,
+    this.weightLbs,
+    this.powerProfile,
+    this.speedProfile,
+    this.automatedOvr,
+    this.assessmentData,
   });
 
-  /// OVR always visible to coaches — uses actualOvr on Day 1 when displayed ovr is 0.
-  int get coachVisibleOvr => (actualOvr != null && actualOvr! > 0) ? actualOvr! : ovr;
+  /// Merged OVR: averages manual and automated when both exist.
+  /// Falls back to manual-only when no assessment data is present.
+  int get finalOvr {
+    final manual = (actualOvr != null && actualOvr! > 0) ? actualOvr! : ovr;
+    if (automatedOvr == null || automatedOvr == 0) return manual;
+    if (manual == 0) return automatedOvr!;
+    return ((manual + automatedOvr!) / 2).round().clamp(0, 99);
+  }
+
+  /// OVR always visible to coaches — uses finalOvr (merged manual + automated).
+  int get coachVisibleOvr => finalOvr;
+
+  /// Jersey for UI: null, empty, whitespace-only, or literal `"null"` → `"0"`.
+  String get displayJerseyNumber {
+    final j = (jerseyNumber ?? '').trim();
+    if (j.isEmpty || j.toLowerCase() == 'null') return '0';
+    return j;
+  }
+
+  /// Values that use coach app routing, invite flow, and admin coach lists.
+  static const Set<String> coachRoleValues = {
+    'coach',
+    'Head Coach',
+    'Assistant Coach',
+  };
+
+  static bool isCoachRole(String? role) =>
+      role != null && coachRoleValues.contains(role);
+
+  /// Settings badge (all caps).
+  static String coachRoleBadgeUppercase(String? role) {
+    switch (role) {
+      case 'Assistant Coach':
+        return 'ASSISTANT COACH';
+      case 'Head Coach':
+        return 'HEAD COACH';
+      case 'coach':
+      default:
+        return 'HEAD COACH';
+    }
+  }
+
+  /// Feed / announcements (`actorRole`).
+  static String coachRoleTitleForFeed(String? role) {
+    switch (role) {
+      case 'Assistant Coach':
+        return 'Assistant Coach';
+      case 'Head Coach':
+        return 'Head Coach';
+      case 'coach':
+      default:
+        return 'Head Coach';
+    }
+  }
 
   UserModel copyWith({
     String? uid,
@@ -84,6 +155,13 @@ class UserModel {
     Map<String, dynamic>? currentStreak,
     DateTime? createdAt,
     DateTime? lastActiveAt,
+    int? grade,
+    int? heightInches,
+    int? weightLbs,
+    String? powerProfile,
+    String? speedProfile,
+    int? automatedOvr,
+    Map<String, dynamic>? assessmentData,
   }) {
     return UserModel(
       uid: uid ?? this.uid,
@@ -111,6 +189,13 @@ class UserModel {
       currentStreak: currentStreak ?? this.currentStreak,
       createdAt: createdAt ?? this.createdAt,
       lastActiveAt: lastActiveAt ?? this.lastActiveAt,
+      grade: grade ?? this.grade,
+      heightInches: heightInches ?? this.heightInches,
+      weightLbs: weightLbs ?? this.weightLbs,
+      powerProfile: powerProfile ?? this.powerProfile,
+      speedProfile: speedProfile ?? this.speedProfile,
+      automatedOvr: automatedOvr ?? this.automatedOvr,
+      assessmentData: assessmentData ?? this.assessmentData,
     );
   }
 
@@ -141,6 +226,15 @@ class UserModel {
       currentStreak: json['currentStreak'] != null ? Map<String, dynamic>.from(json['currentStreak']) : {},
       createdAt: json['createdAt'] != null ? (json['createdAt'] as Timestamp).toDate() : null,
       lastActiveAt: json['lastActiveAt'] != null ? (json['lastActiveAt'] as Timestamp).toDate() : null,
+      grade: json['grade'] as int?,
+      heightInches: json['heightInches'] as int?,
+      weightLbs: json['weightLbs'] as int?,
+      powerProfile: json['powerProfile'] as String?,
+      speedProfile: json['speedProfile'] as String?,
+      automatedOvr: json['automatedOvr'] as int?,
+      assessmentData: json['assessmentData'] != null
+          ? Map<String, dynamic>.from(json['assessmentData'])
+          : null,
     );
   }
 
@@ -171,6 +265,13 @@ class UserModel {
       'currentStreak': currentStreak,
       'createdAt': createdAt != null ? Timestamp.fromDate(createdAt!) : null,
       'lastActiveAt': lastActiveAt != null ? Timestamp.fromDate(lastActiveAt!) : null,
+      'grade': grade,
+      'heightInches': heightInches,
+      'weightLbs': weightLbs,
+      'powerProfile': powerProfile,
+      'speedProfile': speedProfile,
+      'automatedOvr': automatedOvr,
+      'assessmentData': assessmentData,
     };
   }
 }

@@ -5,6 +5,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import '../../core/constants/app_assets.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/widgets/stadium_background.dart';
+import '../../core/widgets/fire_sparks_background.dart';
 import '../../core/widgets/glass_card.dart';
 import '../../core/widgets/glass_text_field.dart';
 import '../../core/widgets/arena_button.dart';
@@ -16,10 +17,15 @@ class ForgotPasswordView extends GetView<ForgotPasswordController> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.transparent,
       body: StadiumBackground(
-        child: SafeArea(
-          child: Column(
-            children: [
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            // const FireSparksBackground(),
+            SafeArea(
+              child: Column(
+                children: [
               // Back Button
               Align(
                 alignment: Alignment.centerLeft,
@@ -102,8 +108,10 @@ class ForgotPasswordView extends GetView<ForgotPasswordController> {
                   ),
                 ),
               ),
-            ],
-          ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );

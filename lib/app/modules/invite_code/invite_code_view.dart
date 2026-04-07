@@ -1,13 +1,15 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:pin_code_fields/pin_code_fields.dart';
 import '../../core/constants/app_assets.dart';
-import '../../core/constants/app_colors.dart';
 import '../../core/widgets/stadium_background.dart';
 import '../../core/widgets/arena_button.dart';
+import '../../core/widgets/fire_sparks_background.dart';
 import 'invite_code_controller.dart';
+import '../../data/models/user_model.dart';
 import '../../data/repositories/auth_repository.dart' as import_repo;
 
 class InviteCodeView extends GetView<InviteCodeController> {
@@ -16,10 +18,16 @@ class InviteCodeView extends GetView<InviteCodeController> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.transparent,
       body: StadiumBackground(
-        child: SafeArea(
-          child: Column(
-            children: [
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            // Subtle premium background layer (non-interactive).
+            // const FireSparksBackground(),
+            SafeArea(
+              child: Column(
+                children: [
               // Head Navigation & Logout block (for testing and flow escape)
               Align(
                 alignment: Alignment.centerLeft,
@@ -65,18 +73,82 @@ class InviteCodeView extends GetView<InviteCodeController> {
                               curve: Curves.elasticOut,
                             ),
 
-                        const SizedBox(height: 32),
+                        const SizedBox(height: 24),
+
+                        // Coach-only: Create Team vs Join Team
+                        Obx(() {
+                          if (!UserModel.isCoachRole(controller.userRole.value)) {
+                            return const SizedBox.shrink();
+                          }
+                          return Column(
+                            children: [
+                              SizedBox(
+                                width: double.infinity,
+                                child: CupertinoSlidingSegmentedControl<int>(
+                                  backgroundColor: Colors.white.withValues(
+                                    alpha: 0.08,
+                                  ),
+                                  thumbColor: const Color(0xFF00A1FF)
+                                      .withValues(alpha: 0.35),
+                                  groupValue: controller
+                                      .coachOnboardingSegment.value,
+                                  onValueChanged: (int? v) {
+                                    if (v == null) return;
+                                    controller.coachOnboardingSegment.value = v;
+                                  },
+                                  children: <int, Widget>{
+                                    0: Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 10,
+                                      ),
+                                      child: Text(
+                                        'Create Team',
+                                        style: GoogleFonts.spaceGrotesk(
+                                          color: Colors.white,
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w800,
+                                          letterSpacing: 0.4,
+                                        ),
+                                      ),
+                                    ),
+                                    1: Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 10,
+                                      ),
+                                      child: Text(
+                                        'Join Team',
+                                        style: GoogleFonts.spaceGrotesk(
+                                          color: Colors.white,
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w800,
+                                          letterSpacing: 0.4,
+                                        ),
+                                      ),
+                                    ),
+                                  },
+                                ),
+                              ),
+                              const SizedBox(height: 24),
+                            ],
+                          );
+                        }),
 
                         // Title
-                        Text(
-                              'ENTER YOUR CODE',
-                              style: GoogleFonts.spaceGrotesk(
-                                fontSize: 28,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                                letterSpacing: -0.5,
-                              ),
-                            )
+                        Obx(
+                          () => Text(
+                            UserModel.isCoachRole(controller.userRole.value)
+                                ? (controller.coachOnboardingSegment.value == 0
+                                    ? 'ENTER SCHOOL CODE'
+                                    : 'ENTER TEAM CODE')
+                                : 'ENTER YOUR CODE',
+                            style: GoogleFonts.spaceGrotesk(
+                              fontSize: 28,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                              letterSpacing: -0.5,
+                            ),
+                          ),
+                        )
                             .animate(delay: 200.ms)
                             .fade(duration: 1200.ms)
                             .slideY(
@@ -92,8 +164,12 @@ class InviteCodeView extends GetView<InviteCodeController> {
                         Obx(
                           () =>
                               Text(
-                                    controller.userRole.value == 'coach'
-                                        ? 'Your Super admin will provide\nyour\nschool access code'
+                                    UserModel.isCoachRole(controller.userRole.value)
+                                        ? (controller.coachOnboardingSegment
+                                                    .value ==
+                                                0
+                                            ? 'Your Super admin will provide your school access code'
+                                            : 'Your Head Coach will provide your team access code')
                                         : 'Your coach will provide\nyour\nteam access code',
                                     textAlign: TextAlign.center,
                                     style: GoogleFonts.spaceGrotesk(
@@ -260,8 +336,11 @@ class InviteCodeView extends GetView<InviteCodeController> {
                         // Join Button
                         Obx(
                               () => ArenaButton(
-                                label: controller.userRole.value == 'coach'
-                                    ? 'JOIN SCHOOL'
+                                label: UserModel.isCoachRole(controller.userRole.value)
+                                    ? (controller.coachOnboardingSegment.value ==
+                                            0
+                                        ? 'VERIFY SCHOOL'
+                                        : 'JOIN DASHBOARD')
                                     : 'JOIN TEAM',
                                 onPressed: controller.joinTeam,
                                 isLoading: controller.isLoading.value,
@@ -289,8 +368,12 @@ class InviteCodeView extends GetView<InviteCodeController> {
                               ),
                               children: [
                                 TextSpan(
-                                  text: controller.userRole.value == 'coach'
-                                      ? 'Contact your admin'
+                                  text: UserModel.isCoachRole(controller.userRole.value)
+                                      ? (controller.coachOnboardingSegment
+                                                  .value ==
+                                              0
+                                          ? 'Contact your admin'
+                                          : 'Contact your coach')
                                       : 'Contact your coach',
                                   style: GoogleFonts.spaceGrotesk(
                                     color: const Color(
@@ -310,8 +393,10 @@ class InviteCodeView extends GetView<InviteCodeController> {
                   ),
                 ),
               ),
-            ],
-          ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );

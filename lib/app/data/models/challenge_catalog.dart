@@ -3,13 +3,13 @@ class ChallengeCatalog {
   ChallengeCatalog._();
 
   static const List<String> parentCategories = [
-    'Performance',
-    'Classroom',
-    'Program',
-    'Standard',
+    'Athlete',
+    'Student',
+    'Teammate',
+    'Citizen',
   ];
 
-  static const List<String> performance = [
+  static const List<String> athlete = [
     'Strength Improvement',
     'Speed / Agility Improvement',
     'Competition Winner',
@@ -17,7 +17,7 @@ class ChallengeCatalog {
     'Testing Improvement',
   ];
 
-  static const List<String> standard = [
+  static const List<String> citizen = [
     'Elite Effort',
     'Positive Attitude',
     'Coachability',
@@ -25,7 +25,7 @@ class ChallengeCatalog {
     'Bounced Back From Mistake',
   ];
 
-  static const List<String> program = [
+  static const List<String> teammate = [
     'Voluntary Workout',
     'Team Support',
     'Community Service',
@@ -34,7 +34,7 @@ class ChallengeCatalog {
     'Extra Work for Team',
   ];
 
-  static const List<String> classroom = [
+  static const List<String> student = [
     'Assignment Completed',
     'Teacher Recognition',
     'Classroom Conduct',
@@ -46,14 +46,14 @@ class ChallengeCatalog {
 
   static List<String> challengesFor(String parentCategory) {
     switch (parentCategory) {
-      case 'Performance':
-        return performance;
-      case 'Standard':
-        return standard;
-      case 'Program':
-        return program;
-      case 'Classroom':
-        return classroom;
+      case 'Athlete':
+        return athlete;
+      case 'Citizen':
+        return citizen;
+      case 'Teammate':
+        return teammate;
+      case 'Student':
+        return student;
       default:
         return const [];
     }

@@ -9,6 +9,8 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../coach_controller.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/widgets/stadium_background.dart';
+import '../../../core/components/animated_glowing_border.dart';
+import '../../../core/widgets/periodic_shimmer_bar.dart';
 
 class TeamSettingsView extends StatefulWidget {
   const TeamSettingsView({super.key});
@@ -126,41 +128,56 @@ class _TeamSettingsViewState extends State<TeamSettingsView> {
       return Scaffold(
         backgroundColor: Colors.transparent,
         body: StadiumBackground(
-          child: SafeArea(
-            child: Column(
-              children: [
-                // App Bar
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      IconButton(
-                        icon: const Icon(Icons.arrow_back, color: Colors.white, size: 28),
-                        onPressed: () => Get.back(),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              // const FireSparksBackground(),
+              SafeArea(
+                child: Column(
+                  children: [
+                    // App Bar
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16.0, vertical: 12.0),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.arrow_back,
+                                color: Colors.white, size: 28),
+                            onPressed: () => Get.back(),
+                          ),
+                          Text(
+                            'TEAM SETTINGS',
+                            style: GoogleFonts.spaceGrotesk(
+                                color: Colors.white,
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 2.0),
+                          ),
+                          TextButton(
+                            onPressed: isLoading ? null : _save,
+                            child: Text(
+                              'SAVE',
+                              style: GoogleFonts.spaceGrotesk(
+                                  color: Colors.white54,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 1.5),
+                            ),
+                          ),
+                        ],
                       ),
-                      Text(
-                        'TEAM SETTINGS',
-                        style: GoogleFonts.spaceGrotesk(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold, letterSpacing: 2.0),
-                      ),
-                      TextButton(
-                        onPressed: isLoading ? null : _save,
-                        child: Text(
-                          'SAVE',
-                          style: GoogleFonts.spaceGrotesk(color: Colors.white54, fontSize: 14, fontWeight: FontWeight.bold, letterSpacing: 1.5),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+                    ),
 
-                Expanded(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 8.0),
-                    physics: const BouncingScrollPhysics(),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
+                    Expanded(
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 24.0, vertical: 8.0),
+                        physics: const BouncingScrollPhysics(),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
                         // Logo Circle
                         Center(
                           child: Obx(() {
@@ -170,45 +187,56 @@ class _TeamSettingsViewState extends State<TeamSettingsView> {
                               onTap: controller.updateTeamLogo,
                               child: Stack(
                                 children: [
-                                  Container(
-                                    width: 144,
-                                    height: 144,
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFF141B2D),
-                                      shape: BoxShape.circle,
-                                      border: Border.all(color: Colors.white.withOpacity(0.2), width: 4),
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: _parseColor(primaryColorHex).withOpacity(0.4),
-                                          blurRadius: 30,
-                                          spreadRadius: 0,
-                                        ),
-                                      ],
-                                      image: logoUrl != null && logoUrl.isNotEmpty
-                                          ? DecorationImage(
-                                              image: CachedNetworkImageProvider(logoUrl),
-                                              fit: BoxFit.cover,
-                                            )
-                                          : null,
-                                    ),
-                                    child: logoUrl == null || logoUrl.isEmpty
-                                        ? Center(
-                                            child: Column(
-                                              mainAxisAlignment: MainAxisAlignment.center,
-                                              children: [
-                                                const Icon(Icons.shield_outlined, color: Colors.white54, size: 36),
-                                                const SizedBox(height: 4),
-                                                Text(
-                                                  team?.name.toUpperCase() ?? 'TEAM',
-                                                  style: GoogleFonts.spaceGrotesk(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
-                                                  textAlign: TextAlign.center,
-                                                  maxLines: 2,
-                                                  overflow: TextOverflow.ellipsis,
-                                                ),
-                                              ],
+                                  AnimatedGlowingBorder(
+                                    // Preserve the original logo constraints: 144x144.
+                                    // Add a clean 4px glow gap around it.
+                                    diameter: 152,
+                                    borderWidth: 4,
+                                    duration: const Duration(seconds: 4),
+                                    child: SizedBox(
+                                      width: 144,
+                                      height: 144,
+                                      child: Container(
+                                        width: 144,
+                                        height: 144,
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFF141B2D),
+                                          shape: BoxShape.circle,
+                                          border: Border.all(color: Colors.white.withOpacity(0.2), width: 4),
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: _parseColor(primaryColorHex).withOpacity(0.4),
+                                              blurRadius: 30,
+                                              spreadRadius: 0,
                                             ),
-                                          )
-                                        : null,
+                                          ],
+                                          image: logoUrl != null && logoUrl.isNotEmpty
+                                              ? DecorationImage(
+                                                  image: CachedNetworkImageProvider(logoUrl),
+                                                  fit: BoxFit.cover,
+                                                )
+                                              : null,
+                                        ),
+                                        child: logoUrl == null || logoUrl.isEmpty
+                                            ? Center(
+                                                child: Column(
+                                                  mainAxisAlignment: MainAxisAlignment.center,
+                                                  children: [
+                                                    const Icon(Icons.shield_outlined, color: Colors.white54, size: 36),
+                                                    const SizedBox(height: 4),
+                                                    Text(
+                                                      team?.name.toUpperCase() ?? 'TEAM',
+                                                      style: GoogleFonts.spaceGrotesk(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                                                      textAlign: TextAlign.center,
+                                                      maxLines: 2,
+                                                      overflow: TextOverflow.ellipsis,
+                                                    ),
+                                                  ],
+                                                ),
+                                              )
+                                            : null,
+                                      ),
+                                    ),
                                   ),
                                   // Upload loading overlay
                                   if (uploading)
@@ -539,17 +567,20 @@ class _TeamSettingsViewState extends State<TeamSettingsView> {
                         Center(
                           child: GestureDetector(
                             onTap: () => Get.defaultDialog(
-                              title: 'Deactivate Team?',
+                              title: 'Delete Team?',
                               titleStyle: GoogleFonts.spaceGrotesk(color: Colors.white, fontWeight: FontWeight.bold),
-                              middleText: 'This will deactivate your team. Players will lose access.',
+                              middleText: 'This will delete your team (mark it inactive). Players will lose access.',
                               middleTextStyle: GoogleFonts.inter(color: Colors.white70),
                               backgroundColor: const Color(0xFF0F172A),
                               buttonColor: const Color(0xFFEF4444),
                               cancelTextColor: Colors.white,
                               confirmTextColor: Colors.white,
-                              textConfirm: 'Deactivate',
+                              textConfirm: 'Delete',
                               textCancel: 'Cancel',
-                              onConfirm: () => Get.back(),
+                              onConfirm: () async {
+                                Get.back();
+                                await controller.deactivateCurrentTeam();
+                              },
                             ),
                             child: Container(
                               padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 14),
@@ -558,20 +589,22 @@ class _TeamSettingsViewState extends State<TeamSettingsView> {
                                 border: Border.all(color: const Color(0xFFEF4444), width: 1),
                               ),
                               child: Text(
-                                'DEACTIVATE TEAM',
+                                'DELETE TEAM',
                                 style: GoogleFonts.spaceGrotesk(color: const Color(0xFFEF4444), fontSize: 13, fontWeight: FontWeight.bold, letterSpacing: 1.5),
                               ),
                             ),
                           ),
                         ).animate(delay: 500.ms).fade(),
 
-                        const SizedBox(height: 40),
-                      ],
+                            const SizedBox(height: 40),
+                          ],
+                        ),
+                      ),
                     ),
-                  ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       );
@@ -579,20 +612,25 @@ class _TeamSettingsViewState extends State<TeamSettingsView> {
   }
 
   Widget _miniBar(Color color, double fill) {
+    final clamped = fill.clamp(0.0, 1.0);
     return Expanded(
-      child: Container(
-        height: 5,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(3),
-          color: Colors.white12,
-        ),
-        child: FractionallySizedBox(
-          alignment: Alignment.centerLeft,
-          widthFactor: fill,
-          child: Container(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(3),
-              color: color,
+      child: PeriodicShimmerBar(
+        baseColor: color,
+        shimmerFraction: clamped,
+        child: Container(
+          height: 5,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(3),
+            color: Colors.white12,
+          ),
+          child: FractionallySizedBox(
+            alignment: Alignment.centerLeft,
+            widthFactor: clamped,
+            child: Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(3),
+                color: color,
+              ),
             ),
           ),
         ),

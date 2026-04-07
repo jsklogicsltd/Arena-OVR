@@ -1,7 +1,26 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../data/repositories/auth_repository.dart';
 import '../../routes/app_routes.dart';
+
+/// Maps [FirebaseAuthException.code] to copy suitable for snackbars (no `[firebase_auth/...]` noise).
+String _userFacingFirebaseAuthMessage(FirebaseAuthException e) {
+  switch (e.code) {
+    case 'invalid-credential':
+    case 'wrong-password':
+    case 'user-not-found':
+      return 'Invalid email or password. Please try again.';
+    case 'invalid-email':
+      return 'Please enter a valid email address.';
+    case 'user-disabled':
+      return 'This account has been disabled. Please contact support.';
+    case 'network-request-failed':
+      return 'Network error. Please check your internet connection.';
+    default:
+      return 'An unexpected error occurred. Please try again later.';
+  }
+}
 
 class AuthController extends GetxController {
   final AuthRepository _authRepo = AuthRepository();
@@ -24,11 +43,22 @@ class AuthController extends GetxController {
     try {
       await _authRepo.signIn(emailController.text.trim(), passwordController.text);
       Get.offAllNamed(Routes.SPLASH);
-    } catch (e) {
-      Get.snackbar('Login Failed', e.toString(), 
+    } on FirebaseAuthException catch (e) {
+      Get.snackbar(
+        'Login Failed',
+        _userFacingFirebaseAuthMessage(e),
         snackPosition: SnackPosition.BOTTOM,
         backgroundColor: Colors.red.withOpacity(0.8),
-        colorText: Colors.white);
+        colorText: Colors.white,
+      );
+    } catch (_) {
+      Get.snackbar(
+        'Login Failed',
+        'An unexpected error occurred. Please try again later.',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.red.withOpacity(0.8),
+        colorText: Colors.white,
+      );
     } finally {
       isLoading.value = false;
     }
@@ -52,11 +82,22 @@ class AuthController extends GetxController {
         snackPosition: SnackPosition.BOTTOM,
         backgroundColor: Colors.green.withOpacity(0.8),
         colorText: Colors.white);
-    } catch (e) {
-      Get.snackbar('Error', e.toString(), 
+    } on FirebaseAuthException catch (e) {
+      Get.snackbar(
+        'Error',
+        _userFacingFirebaseAuthMessage(e),
         snackPosition: SnackPosition.BOTTOM,
         backgroundColor: Colors.red.withOpacity(0.8),
-        colorText: Colors.white);
+        colorText: Colors.white,
+      );
+    } catch (_) {
+      Get.snackbar(
+        'Error',
+        'An unexpected error occurred. Please try again later.',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.red.withOpacity(0.8),
+        colorText: Colors.white,
+      );
     }
   }
 }

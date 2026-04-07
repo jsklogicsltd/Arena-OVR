@@ -5,7 +5,8 @@ import 'package:flutter_animate/flutter_animate.dart';
 import '../coach_controller.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/widgets/stadium_background.dart';
-import '../../../core/widgets/glass_card.dart';
+import '../../../core/widgets/fire_sparks_background.dart';
+import '../../../core/components/animated_glowing_border.dart';
 
 class AnnouncementView extends StatefulWidget {
   const AnnouncementView({super.key});
@@ -48,11 +49,15 @@ class _AnnouncementViewState extends State<AnnouncementView> {
       final String coachPhoto = controller.coachPhotoUrl.value;
 
       return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: StadiumBackground(
-        child: SafeArea(
-          child: Column(
+        backgroundColor: Colors.transparent,
+        body: StadiumBackground(
+          child: Stack(
+            fit: StackFit.expand,
             children: [
+              // const FireSparksBackground(),
+              SafeArea(
+                child: Column(
+                  children: [
               // Custom App Bar
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
@@ -88,22 +93,33 @@ class _AnnouncementViewState extends State<AnnouncementView> {
                       // Coach Profile Row
                       Row(
                         children: [
-                          Container(
-                            width: 50,
-                            height: 50,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              border: Border.all(color: const Color(0xFFFDE047), width: 2), // Yellow border from design
-                              image: (coachPhoto.isNotEmpty)
-                                  ? DecorationImage(
-                                      image: NetworkImage(coachPhoto),
-                                      fit: BoxFit.cover,
-                                    )
-                                  : null,
+                          AnimatedGlowingBorder(
+                            // Preserve strict sizing: original 50x50.
+                            // Add clean 3px glow gap around it.
+                            diameter: 56,
+                            borderWidth: 3,
+                            duration: const Duration(seconds: 4),
+                            child: SizedBox(
+                              width: 50,
+                              height: 50,
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                      color: const Color(0xFFFDE047), width: 2),
+                                  image: (coachPhoto.isNotEmpty)
+                                      ? DecorationImage(
+                                          image: NetworkImage(coachPhoto),
+                                          fit: BoxFit.cover,
+                                        )
+                                      : null,
+                                ),
+                                child: coachPhoto.isEmpty
+                                    ? const Icon(Icons.person,
+                                        color: Colors.white54, size: 22)
+                                    : null,
+                              ),
                             ),
-                            child: coachPhoto.isEmpty
-                                ? const Icon(Icons.person, color: Colors.white54, size: 22)
-                                : null,
                           ),
                           const SizedBox(width: 16),
                           Column(
@@ -219,13 +235,26 @@ class _AnnouncementViewState extends State<AnnouncementView> {
                                     children: [
                                       Row(
                                         children: [
-                                          CircleAvatar(
-                                            radius: 12,
-                                            backgroundColor: Colors.white10,
-                                            backgroundImage: coachPhoto.isNotEmpty ? NetworkImage(coachPhoto) : null,
-                                            child: coachPhoto.isEmpty
-                                                ? const Icon(Icons.person, color: Colors.white54, size: 14)
-                                                : null,
+                                          AnimatedGlowingBorder(
+                                            diameter: 30,
+                                            borderWidth: 3,
+                                            duration: const Duration(seconds: 4),
+                                            child: SizedBox(
+                                              width: 24,
+                                              height: 24,
+                                              child: CircleAvatar(
+                                                radius: 12,
+                                                backgroundColor: Colors.white10,
+                                                backgroundImage: coachPhoto.isNotEmpty
+                                                    ? NetworkImage(coachPhoto)
+                                                    : null,
+                                                child: coachPhoto.isEmpty
+                                                    ? const Icon(Icons.person,
+                                                        color: Colors.white54,
+                                                        size: 14)
+                                                    : null,
+                                              ),
+                                            ),
                                           ),
                                           const SizedBox(width: 8),
                                           Text(coachName, style: GoogleFonts.spaceGrotesk(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
@@ -258,48 +287,63 @@ class _AnnouncementViewState extends State<AnnouncementView> {
                 ),
               ),
 
-              // Bottom Submit Button
-              Padding(
-                padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-                child: Column(
-                  children: [
-                    GestureDetector(
-                      onTap: isLoading ? null : _submit,
-                      child: Container(
-                        width: double.infinity,
-                        height: 56,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF00B4D8), // Cyan color from design
-                          borderRadius: BorderRadius.circular(16),
-                          boxShadow: [
-                            BoxShadow(color: const Color(0xFF00B4D8).withOpacity(0.3), blurRadius: 20, spreadRadius: 2, offset: const Offset(0, 4)),
-                          ],
-                        ),
-                        child: Center(
-                          child: isLoading 
-                            ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                            : Text(
-                                'POST TO TEAM',
-                                style: GoogleFonts.spaceGrotesk(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold, letterSpacing: 1.5),
+                    // Bottom Submit Button
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+                      child: Column(
+                        children: [
+                          GestureDetector(
+                            onTap: isLoading ? null : _submit,
+                            child: Container(
+                              width: double.infinity,
+                              height: 56,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF00B4D8), // Cyan color from design
+                                borderRadius: BorderRadius.circular(16),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: const Color(0xFF00B4D8).withOpacity(0.3),
+                                    blurRadius: 20,
+                                    spreadRadius: 2,
+                                    offset: const Offset(0, 4),
+                                  ),
+                                ],
                               ),
-                        ),
+                              child: Center(
+                                child: isLoading
+                                    ? const SizedBox(
+                                        height: 20,
+                                        width: 20,
+                                        child: CircularProgressIndicator(
+                                            color: Colors.white, strokeWidth: 2),
+                                      )
+                                    : Text(
+                                        'POST TO TEAM',
+                                        style: GoogleFonts.spaceGrotesk(
+                                            color: Colors.white,
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.bold,
+                                            letterSpacing: 1.5),
+                                      ),
+                              ),
+                            ),
+                          ).animate(delay: 400.ms).fade().slideY(begin: 0.2),
+                          const SizedBox(height: 12),
+                          Text(
+                            'All team members will be notified instantly',
+                            style: GoogleFonts.inter(
+                                color: Colors.white54, fontSize: 12),
+                          ).animate(delay: 400.ms).fade(),
+                        ],
                       ),
-                    ).animate(delay: 400.ms).fade().slideY(begin: 0.2),
-                    
-                    const SizedBox(height: 12),
-                    
-                    Text(
-                      'All team members will be notified instantly',
-                      style: GoogleFonts.inter(color: Colors.white54, fontSize: 12),
-                    ).animate(delay: 400.ms).fade(),
+                    ),
                   ],
                 ),
               ),
             ],
           ),
         ),
-      ),
-    );
+      );
     }); // end Obx
   }
 }

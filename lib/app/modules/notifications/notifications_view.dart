@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import 'notifications_controller.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/widgets/stadium_background.dart';
+import '../../core/widgets/fire_sparks_background.dart';
 
 class NotificationsView extends GetView<NotificationsController> {
   const NotificationsView({Key? key}) : super(key: key);
@@ -15,45 +16,51 @@ class NotificationsView extends GetView<NotificationsController> {
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: StadiumBackground(
-        child: SafeArea(
-          child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+        child: Stack(
+          fit: StackFit.expand,
           children: [
-            _buildHeader(context),
-            _buildFilterPills(),
-            Expanded(
-              child: Obx(() {
-                final items = controller.displayedItems;
-                if (items.isEmpty) {
-                  return Center(
-                    child: Text(
-                      controller.filterIndex.value == 1
-                          ? 'No unread notifications'
-                          : controller.filterIndex.value == 2
-                              ? 'No archived items'
-                              : 'No notifications yet',
-                      style: GoogleFonts.inter(
-                        color: Colors.white54,
-                        fontSize: 14,
-                      ),
-                    ),
-                  );
-                }
-                return ListView.builder(
-                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 100),
-                  physics: const BouncingScrollPhysics(),
-                  itemCount: items.length,
-                  itemBuilder: (context, index) {
-                    return _NotificationCard(
-                      item: items[index],
-                      onTap: () => controller.markAsRead(items[index].id),
-                    );
-                  },
-                );
-              }),
+            // const FireSparksBackground(),
+            SafeArea(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _buildHeader(context),
+                  _buildFilterPills(),
+                  Expanded(
+                    child: Obx(() {
+                      final items = controller.displayedItems;
+                      if (items.isEmpty) {
+                        return Center(
+                          child: Text(
+                            controller.filterIndex.value == 1
+                                ? 'No unread notifications'
+                                : controller.filterIndex.value == 2
+                                    ? 'No archived items'
+                                    : 'No notifications yet',
+                            style: GoogleFonts.inter(
+                              color: Colors.white54,
+                              fontSize: 14,
+                            ),
+                          ),
+                        );
+                      }
+                      return ListView.builder(
+                        padding: const EdgeInsets.fromLTRB(20, 16, 20, 100),
+                        physics: const BouncingScrollPhysics(),
+                        itemCount: items.length,
+                        itemBuilder: (context, index) {
+                          return _NotificationCard(
+                            item: items[index],
+                            onTap: () => controller.markAsRead(items[index].id),
+                          );
+                        },
+                      );
+                    }),
+                  ),
+                ],
+              ),
             ),
           ],
-        ),
         ),
       ),
     );

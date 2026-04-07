@@ -9,6 +9,8 @@ import '../../core/widgets/stadium_background.dart';
 import '../../core/widgets/glass_card.dart';
 import '../../core/widgets/glass_text_field.dart';
 import '../../core/widgets/arena_button.dart';
+import '../../core/widgets/fire_sparks_background.dart';
+import '../../core/components/animated_glowing_border.dart';
 import 'signup_controller.dart';
 
 class SignupView extends GetView<SignupController> {
@@ -17,25 +19,31 @@ class SignupView extends GetView<SignupController> {
   @override
   Widget build(BuildContext context) {
     return StadiumBackground(
-      child: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 32.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          // Subtle premium background layer (non-interactive).
+          // const FireSparksBackground(),
+          Center(
+            child: SingleChildScrollView(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 24.0, vertical: 32.0),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
 
-              // ── Logo ─────────────────────────────────────────────────────────
-              _buildLogo(),
+                  // ── Logo ─────────────────────────────────────────────────────────
+                  _buildLogo(),
 
-              const SizedBox(height: 36),
+                  const SizedBox(height: 36),
 
-              // ── Card ─────────────────────────────────────────────────────────
-              GlassCard(
-                borderRadius: 28.0,
-                padding: const EdgeInsets.fromLTRB(28, 32, 28, 28),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
+                  // ── Card ─────────────────────────────────────────────────────────
+                  GlassCard(
+                    borderRadius: 28.0,
+                    padding: const EdgeInsets.fromLTRB(28, 32, 28, 28),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
 
                     // ── Avatar picker ─────────────────────────────────────
                     Center(
@@ -49,43 +57,58 @@ class SignupView extends GetView<SignupController> {
                             child: Stack(
                               clipBehavior: Clip.none,
                               children: [
-                                // Circle avatar
-                                Container(
-                                  width: 90,
-                                  height: 90,
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    color: AppColors.primary.withOpacity(0.12),
-                                    border: Border.all(
-                                      color: AppColors.primary,
-                                      width: 2.5,
+                                // Avatar with premium rotating glow.
+                                // Keep strict constraints: 90x90 avatar + 3px glow gap each side => 96 diameter.
+                                Positioned(
+                                  left: 0,
+                                  top: 0,
+                                  child: AnimatedGlowingBorder(
+                                    diameter: 96,
+                                    borderWidth: 3,
+                                    duration: const Duration(seconds: 4),
+                                    child: SizedBox(
+                                      width: 90,
+                                      height: 90,
+                                      child: Container(
+                                        decoration: BoxDecoration(
+                                          shape: BoxShape.circle,
+                                          color: AppColors.primary.withOpacity(0.12),
+                                          border: Border.all(
+                                            color: AppColors.primary,
+                                            width: 2.5,
+                                          ),
+                                          image: file != null
+                                              ? DecorationImage(
+                                                  image: FileImage(file),
+                                                  fit: BoxFit.cover,
+                                                )
+                                              : null,
+                                        ),
+                                        child: file == null
+                                            ? Column(
+                                                mainAxisAlignment:
+                                                    MainAxisAlignment.center,
+                                                children: [
+                                                  Icon(Icons.person_rounded,
+                                                      color: AppColors.primary
+                                                          .withOpacity(0.8),
+                                                      size: 36),
+                                                  const SizedBox(height: 2),
+                                                  Text(
+                                                    'Photo',
+                                                    style: GoogleFonts.spaceGrotesk(
+                                                      color: AppColors.primary
+                                                          .withOpacity(0.7),
+                                                      fontSize: 9,
+                                                      fontWeight: FontWeight.w600,
+                                                    ),
+                                                  ),
+                                                ],
+                                              )
+                                            : null,
+                                      ),
                                     ),
-                                    image: file != null
-                                        ? DecorationImage(
-                                            image: FileImage(file),
-                                            fit: BoxFit.cover,
-                                          )
-                                        : null,
                                   ),
-                                  child: file == null
-                                      ? Column(
-                                          mainAxisAlignment: MainAxisAlignment.center,
-                                          children: [
-                                            Icon(Icons.person_rounded,
-                                                color: AppColors.primary.withOpacity(0.8),
-                                                size: 36),
-                                            const SizedBox(height: 2),
-                                            Text(
-                                              'Photo',
-                                              style: GoogleFonts.spaceGrotesk(
-                                                color: AppColors.primary.withOpacity(0.7),
-                                                fontSize: 9,
-                                                fontWeight: FontWeight.w600,
-                                              ),
-                                            ),
-                                          ],
-                                        )
-                                      : null,
                                 ),
                                 // Camera badge
                                 Positioned(
@@ -293,13 +316,21 @@ class SignupView extends GetView<SignupController> {
                       duration: 480.ms,
                       curve: Curves.easeOutBack,
                     ),
-                  ],
-                ),
-              )
-              .animate(delay: 160.ms)
-              .fade(duration: 550.ms, curve: Curves.easeOut)
-              .slideY(begin: 0.1, end: 0, duration: 550.ms, curve: Curves.easeOutCubic)
-              .blur(begin: const Offset(6, 6), end: Offset.zero, duration: 500.ms, curve: Curves.easeOut),
+                      ],
+                    ),
+                  )
+                      .animate(delay: 160.ms)
+                      .fade(duration: 550.ms, curve: Curves.easeOut)
+                      .slideY(
+                          begin: 0.1,
+                          end: 0,
+                          duration: 550.ms,
+                          curve: Curves.easeOutCubic)
+                      .blur(
+                          begin: const Offset(6, 6),
+                          end: Offset.zero,
+                          duration: 500.ms,
+                          curve: Curves.easeOut),
 
               const SizedBox(height: 28),
 
@@ -336,6 +367,8 @@ class SignupView extends GetView<SignupController> {
           ),
         ),
       ),
+      ],
+    ),
     );
   }
 

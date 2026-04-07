@@ -7,6 +7,8 @@ class TeamModel {
   final String? schoolInviteCode;
   final String name;
   final String teamCode;
+  /// Sport or program label (e.g. FOOTBALL, Multi-Sport). Optional for legacy docs.
+  final String? sport;
   final bool isActive;
   final List<String> positionGroups; // OFFENSE/DEFENSE/...
   final List<String> customTags; // e.g. Seniors, JV
@@ -26,6 +28,7 @@ class TeamModel {
     this.schoolInviteCode,
     required this.name,
     required this.teamCode,
+    this.sport,
     this.isActive = true,
     this.positionGroups = const ['OFFENSE', 'DEFENSE', 'SPECIAL TEAMS'],
     this.customTags = const [],
@@ -46,6 +49,7 @@ class TeamModel {
     String? schoolInviteCode,
     String? name,
     String? teamCode,
+    String? sport,
     bool? isActive,
     List<String>? positionGroups,
     List<String>? customTags,
@@ -65,6 +69,7 @@ class TeamModel {
       schoolInviteCode: schoolInviteCode ?? this.schoolInviteCode,
       name: name ?? this.name,
       teamCode: teamCode ?? this.teamCode,
+      sport: sport ?? this.sport,
       isActive: isActive ?? this.isActive,
       positionGroups: positionGroups ?? this.positionGroups,
       customTags: customTags ?? this.customTags,
@@ -87,6 +92,7 @@ class TeamModel {
       schoolInviteCode: json['schoolInviteCode'],
       name: json['name'] ?? '',
       teamCode: json['teamCode'] ?? '',
+      sport: json['sport'] as String?,
       isActive: json['isActive'] ?? true,
       positionGroups: json['positionGroups'] != null
           ? List<String>.from(json['positionGroups'])
@@ -112,6 +118,7 @@ class TeamModel {
       'schoolInviteCode': schoolInviteCode,
       'name': name,
       'teamCode': teamCode,
+      if (sport != null && sport!.isNotEmpty) 'sport': sport,
       'isActive': isActive,
       'positionGroups': positionGroups,
       'customTags': customTags,

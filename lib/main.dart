@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'components/video_background.dart';
 import 'app/routes/app_pages.dart';
 import 'app/routes/app_routes.dart';
 import 'app/core/theme/app_theme.dart';
@@ -20,15 +21,25 @@ void main() async {
       initialRoute: Routes.SPLASH,
       getPages: AppPages.pages,
       builder: (context, child) {
-        return GestureDetector(
-          behavior: HitTestBehavior.translucent,
-          onTap: () {
-            final focusScope = FocusScope.of(context);
-            if (!focusScope.hasPrimaryFocus && focusScope.focusedChild != null) {
-              focusScope.unfocus();
-            }
-          },
-          child: child ?? const SizedBox.shrink(),
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            const VideoBackdrop(),
+            Material(
+              type: MaterialType.transparency,
+              child: GestureDetector(
+                behavior: HitTestBehavior.translucent,
+                onTap: () {
+                  final focusScope = FocusScope.of(context);
+                  if (!focusScope.hasPrimaryFocus &&
+                      focusScope.focusedChild != null) {
+                    focusScope.unfocus();
+                  }
+                },
+                child: child ?? const SizedBox.shrink(),
+              ),
+            ),
+          ],
         );
       },
     ),

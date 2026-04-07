@@ -6,6 +6,8 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'feed_controller.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/widgets/stadium_background.dart';
+import '../../core/widgets/fire_sparks_background.dart';
+import '../../core/components/animated_glowing_border.dart';
 import '../../data/models/feed_model.dart';
 import '../coach/coach_controller.dart';
 import '../coach/views/announcement_view.dart';
@@ -48,9 +50,13 @@ class FeedView extends GetView<FeedController> {
   @override
   Widget build(BuildContext context) {
     return StadiumBackground(
-      child: SafeArea(
-        child: Column(
-          children: [
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          // const FireSparksBackground(),
+          SafeArea(
+            child: Column(
+              children: [
             _buildAppBar(context),
             Expanded(
               child: Obx(() {
@@ -78,8 +84,10 @@ class FeedView extends GetView<FeedController> {
                 );
               }),
             ),
-          ],
-        ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -850,23 +858,39 @@ class _GenericFeedCard extends StatelessWidget {
 
 Widget _avatar(String? profileUrl, String name, double size) {
   final initials = name.isNotEmpty ? name.substring(0, 1).toUpperCase() : '?';
-  return Container(
-    width: size,
-    height: size,
-    decoration: BoxDecoration(
-      shape: BoxShape.circle,
-      color: Colors.white12,
-      border: Border.all(color: Colors.white24, width: 1),
-    ),
-    child: ClipOval(
-      child: profileUrl != null && profileUrl.isNotEmpty
-          ? CachedNetworkImage(
-              imageUrl: profileUrl,
-              fit: BoxFit.cover,
-              placeholder: (_, __) => Center(child: Text(initials, style: const TextStyle(color: Colors.white70, fontSize: 14))),
-              errorWidget: (_, __, ___) => Center(child: Text(initials, style: const TextStyle(color: Colors.white70, fontSize: 14))),
-            )
-          : Center(child: Text(initials, style: TextStyle(color: Colors.white70, fontSize: size * 0.4))),
+  return AnimatedGlowingBorder(
+    diameter: size + 6,
+    borderWidth: 3,
+    duration: const Duration(seconds: 4),
+    child: SizedBox(
+      width: size,
+      height: size,
+      child: Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: Colors.white12,
+          border: Border.all(color: Colors.white24, width: 1),
+        ),
+        child: ClipOval(
+          child: profileUrl != null && profileUrl.isNotEmpty
+              ? CachedNetworkImage(
+                  imageUrl: profileUrl,
+                  fit: BoxFit.cover,
+                  placeholder: (_, __) => Center(
+                      child: Text(initials,
+                          style: const TextStyle(color: Colors.white70, fontSize: 14))),
+                  errorWidget: (_, __, ___) => Center(
+                      child: Text(initials,
+                          style: const TextStyle(color: Colors.white70, fontSize: 14))),
+                )
+              : Center(
+                  child: Text(initials,
+                      style:
+                          TextStyle(color: Colors.white70, fontSize: size * 0.4))),
+        ),
+      ),
     ),
   );
 }

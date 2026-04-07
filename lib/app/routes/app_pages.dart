@@ -61,7 +61,15 @@ class AppPages {
     GetPage(name: Routes.NOTIFICATIONS, page: () => const NotificationsView(), binding: BindingsBuilder(() { Get.lazyPut<NotificationsController>(() => NotificationsController()); })),
     GetPage(name: Routes.BADGES, page: () => const BadgesView(), binding: BindingsBuilder(() { Get.lazyPut<BadgesController>(() => BadgesController()); })),
     GetPage(name: Routes.SETTINGS, page: () => const SettingsView(), binding: BindingsBuilder(() { Get.lazyPut<SettingsController>(() => SettingsController()); })),
-    GetPage(name: Routes.CREATE_TEAM, page: () => const CreateTeamView()),
+    GetPage(
+      name: Routes.CREATE_TEAM,
+      page: () => const CreateTeamView(),
+      binding: BindingsBuilder(() {
+        if (!Get.isRegistered<CoachController>()) {
+          Get.put<CoachController>(CoachController(), permanent: true);
+        }
+      }),
+    ),
     GetPage(name: Routes.TEAM_SETTINGS, page: () => const TeamSettingsView()),
     GetPage(name: Routes.SEASON_HQ, page: () => const SeasonView()),
     GetPage(name: Routes.COACH_SETTINGS, page: () => const CoachSettingsView()),

@@ -8,6 +8,8 @@ import '../coach_controller.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/widgets/stadium_background.dart';
 import '../../../core/widgets/glass_card.dart';
+import '../../../core/widgets/fire_sparks_background.dart';
+import '../../../core/components/animated_glowing_border.dart';
 import '../../../data/models/user_model.dart';
 import '../../../routes/app_routes.dart';
 
@@ -124,6 +126,8 @@ class _RosterViewState extends State<RosterView> {
       child: Stack(
         clipBehavior: Clip.none,
         children: [
+          // Premium subtle background layer (non-interactive).
+          // const Positioned.fill(child: FireSparksBackground()),
           Positioned.fill(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -348,34 +352,45 @@ class _RosterViewState extends State<RosterView> {
                       // Safe extraction of real vs mock fields
                       final name = item.name.isNotEmpty ? item.name : 'Unknown';
                       final groupLabel = _bucketForPositionGroup(item.positionGroup);
-                      final position = '#${item.jerseyNumber ?? '0'} · $groupLabel';
+                      final position = '#${item.displayJerseyNumber} · $groupLabel';
                       final int ovr = item.coachVisibleOvr;
                       final bool? trendUp = null; // no real trend signal yet
                       final tierColor = AppColors.getTierColor(ovr);
                       final initials = name.isNotEmpty ? name.substring(0, 1).toUpperCase() : '?';
                       final String? photoUrl = item.profilePicUrl;
 
-                      Widget card = GlassCard(
+                      final baseCard = GlassCard(
                         backgroundColor: const Color(0x0DFFFFFF), // #FFFFFF at 0D (5% approx)
                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                         leftBorderColor: tierColor,
                         child: Row(
                           children: [
-                            Container(
-                              padding: const EdgeInsets.all(2),
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                border: Border.all(color: tierColor, width: 2),
-                              ),
-                              child: CircleAvatar(
-                                radius: 22,
-                                backgroundColor: Colors.white10,
-                                backgroundImage: photoUrl != null && photoUrl.isNotEmpty
-                                    ? CachedNetworkImageProvider(photoUrl)
-                                    : null,
-                                child: photoUrl == null || photoUrl.isEmpty
-                                    ? Text(initials, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold))
-                                    : null,
+                            AnimatedGlowingBorder(
+                              // Preserve original avatar sizing: 44 (radius 22) + 2*2 padding = 48.
+                              // Give the SweepGradient room: add a clean 3px gap around it.
+                              diameter: 54,
+                              borderWidth: 3,
+                              duration: const Duration(seconds: 4),
+                              child: SizedBox(
+                                width: 48,
+                                height: 48,
+                                child: Container(
+                                  padding: const EdgeInsets.all(2),
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    border: Border.all(color: tierColor, width: 2),
+                                  ),
+                                  child: CircleAvatar(
+                                    radius: 22,
+                                    backgroundColor: Colors.white10,
+                                    backgroundImage: photoUrl != null && photoUrl.isNotEmpty
+                                        ? CachedNetworkImageProvider(photoUrl)
+                                        : null,
+                                    child: photoUrl == null || photoUrl.isEmpty
+                                        ? Text(initials, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold))
+                                        : null,
+                                  ),
+                                ),
                               ),
                             ),
                             const SizedBox(width: 16),
@@ -436,7 +451,7 @@ class _RosterViewState extends State<RosterView> {
                         ),
                       );
 
-                      card = GestureDetector(
+                      final tappableCard = GestureDetector(
                         behavior: HitTestBehavior.opaque,
                         onTap: () {
                           final team = controller.currentTeam.value;
@@ -451,12 +466,94 @@ class _RosterViewState extends State<RosterView> {
                             },
                           );
                         },
-                        child: card,
+                        child: baseCard,
                       );
 
                       return Container(
                         margin: const EdgeInsets.only(bottom: 12),
-                        child: card,
+                        child: Dismissible(
+                          key: ValueKey<String>('roster_athlete_${item.uid}'),
+                          direction: DismissDirection.endToStart,
+                          background: Container(
+                            alignment: Alignment.centerRight,
+                            padding: const EdgeInsets.only(right: 20),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFE53935),
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: const Icon(
+                              Icons.delete_outline_rounded,
+                              color: Colors.white,
+                              size: 28,
+                            ),
+                          ),
+                          confirmDismiss: (direction) async {
+                            final confirmed = await Get.dialog<bool>(
+                              AlertDialog(
+                                backgroundColor: const Color(0xFF101A24),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                title: Text(
+                                  'Remove Player?',
+                                  style: GoogleFonts.spaceGrotesk(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 20,
+                                  ),
+                                ),
+                                content: Text(
+                                  'Are you sure you want to remove $name from the team?',
+                                  style: GoogleFonts.inter(
+                                    color: Colors.white70,
+                                    height: 1.45,
+                                  ),
+                                ),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => Get.back(result: false),
+                                    child: Text(
+                                      'Cancel',
+                                      style: GoogleFonts.inter(color: Colors.white54),
+                                    ),
+                                  ),
+                                  TextButton(
+                                    onPressed: () => Get.back(result: true),
+                                    child: Text(
+                                      'Remove',
+                                      style: GoogleFonts.inter(
+                                        color: const Color(0xFFE53935),
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                            if (confirmed != true) return false;
+                            try {
+                              await controller.removePlayer(item.uid);
+                              Get.snackbar(
+                                'Removed',
+                                '$name is no longer on this team.',
+                                snackPosition: SnackPosition.BOTTOM,
+                                backgroundColor: Colors.green.withValues(alpha: 0.88),
+                                colorText: Colors.white,
+                              );
+                              return true;
+                            } catch (e) {
+                              Get.snackbar(
+                                'Error',
+                                'Could not remove player: $e',
+                                snackPosition: SnackPosition.BOTTOM,
+                                backgroundColor: Colors.red.withValues(alpha: 0.85),
+                                colorText: Colors.white,
+                              );
+                              return false;
+                            }
+                          },
+                          child: tappableCard,
+                        ),
                       )
                           .animate(delay: (120 + index * 90).ms)
                           .fade(duration: 450.ms, curve: Curves.easeOut)

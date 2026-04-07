@@ -8,6 +8,8 @@ import 'package:intl/intl.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/widgets/stadium_background.dart';
 import '../../core/widgets/glass_card.dart';
+import '../../core/widgets/fire_sparks_background.dart';
+import '../../core/components/animated_glowing_border.dart';
 import '../../data/models/school_model.dart';
 import '../../data/models/user_model.dart';
 import 'admin_controller.dart';
@@ -59,10 +61,14 @@ class SchoolDetailsView extends StatelessWidget {
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: StadiumBackground(
-        child: SafeArea(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            // const FireSparksBackground(),
+            SafeArea(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
               // Back Button
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
@@ -80,40 +86,52 @@ class SchoolDetailsView extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
                       // Logo
-                      Container(
-                        width: 120,
-                        height: 120,
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(24),
-                          border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.2),
-                            width: 2,
-                          ),
-                          image: (school.logoUrl != null && school.logoUrl!.isNotEmpty)
-                              ? DecorationImage(
-                                  image: NetworkImage(school.logoUrl!),
-                                  fit: BoxFit.cover,
-                                )
-                              : null,
-                          boxShadow: [
-                            BoxShadow(
-                              color: AppColors.tierGold.withValues(alpha: 0.1),
-                              blurRadius: 20,
-                              spreadRadius: 5,
-                            ),
-                          ],
-                        ),
-                        child: (school.logoUrl == null || school.logoUrl!.isEmpty)
-                            ? const Center(
-                                child: Icon(
-                                  Icons.account_balance,
-                                  color: Colors.white70,
-                                  size: 60,
+                      AnimatedGlowingBorder(
+                        // Preserve strict sizing: original 120x120.
+                        // Add clean 3px glow gap around it.
+                        diameter: 126,
+                        borderWidth: 3,
+                        duration: const Duration(seconds: 5),
+                        child: SizedBox(
+                          width: 120,
+                          height: 120,
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(24),
+                              border: Border.all(
+                                color: Colors.white.withValues(alpha: 0.2),
+                                width: 2,
+                              ),
+                              image: (school.logoUrl != null && school.logoUrl!.isNotEmpty)
+                                  ? DecorationImage(
+                                      image: NetworkImage(school.logoUrl!),
+                                      fit: BoxFit.cover,
+                                    )
+                                  : null,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: AppColors.tierGold.withValues(alpha: 0.1),
+                                  blurRadius: 20,
+                                  spreadRadius: 5,
                                 ),
-                              )
-                            : null,
-                      ).animate().fade(duration: 800.ms, curve: Curves.easeOutCubic).scale(begin: const Offset(0.8, 0.8), curve: Curves.easeOutCubic),
+                              ],
+                            ),
+                            child: (school.logoUrl == null || school.logoUrl!.isEmpty)
+                                ? const Center(
+                                    child: Icon(
+                                      Icons.account_balance,
+                                      color: Colors.white70,
+                                      size: 60,
+                                    ),
+                                  )
+                                : null,
+                          ),
+                        ),
+                      )
+                          .animate()
+                          .fade(duration: 800.ms, curve: Curves.easeOutCubic)
+                          .scale(begin: const Offset(0.8, 0.8), curve: Curves.easeOutCubic),
 
                       const SizedBox(height: 24),
 
@@ -365,8 +383,10 @@ class SchoolDetailsView extends StatelessWidget {
                   ),
                 ),
               ),
-            ],
-          ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -424,23 +444,32 @@ class SchoolDetailsView extends StatelessWidget {
         child: Row(
           children: [
             // Avatar
-            Container(
-              width: 46,
-              height: 46,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: color.withValues(alpha: 0.12),
-                border: Border.all(color: color.withValues(alpha: 0.35), width: 1.5),
-              ),
-              child: ClipOval(
-                child: (user.profilePicUrl != null && user.profilePicUrl!.isNotEmpty)
-                    ? CachedNetworkImage(
-                        imageUrl: user.profilePicUrl!,
-                        fit: BoxFit.cover,
-                        placeholder: (_, __) => _initialsWidget(user.name, color),
-                        errorWidget: (_, __, ___) => _initialsWidget(user.name, color),
-                      )
-                    : _initialsWidget(user.name, color),
+            AnimatedGlowingBorder(
+              // Preserve strict sizing: original 46x46.
+              // Add clean 3px glow gap around it.
+              diameter: 52,
+              borderWidth: 3,
+              duration: const Duration(seconds: 4),
+              child: SizedBox(
+                width: 46,
+                height: 46,
+                child: Container(
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: color.withValues(alpha: 0.12),
+                    border: Border.all(color: color.withValues(alpha: 0.35), width: 1.5),
+                  ),
+                  child: ClipOval(
+                    child: (user.profilePicUrl != null && user.profilePicUrl!.isNotEmpty)
+                        ? CachedNetworkImage(
+                            imageUrl: user.profilePicUrl!,
+                            fit: BoxFit.cover,
+                            placeholder: (_, __) => _initialsWidget(user.name, color),
+                            errorWidget: (_, __, ___) => _initialsWidget(user.name, color),
+                          )
+                        : _initialsWidget(user.name, color),
+                  ),
+                ),
               ),
             ),
             const SizedBox(width: 12),
@@ -472,7 +501,7 @@ class SchoolDetailsView extends StatelessWidget {
                   if (!isCoach && user.positionGroup != null) ...[
                     const SizedBox(height: 3),
                     Text(
-                      '${user.positionGroup ?? ''} ${user.jerseyNumber != null ? '· #${user.jerseyNumber}' : ''}',
+                      '${user.positionGroup ?? ''} · #${user.displayJerseyNumber}',
                       style: GoogleFonts.spaceGrotesk(
                         color: color.withValues(alpha: 0.7),
                         fontSize: 10,

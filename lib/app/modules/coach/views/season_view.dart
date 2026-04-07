@@ -8,6 +8,7 @@ import 'package:intl/intl.dart';
 import '../coach_controller.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/widgets/stadium_background.dart';
+import '../../../core/widgets/fire_sparks_background.dart';
 
 class SeasonView extends StatefulWidget {
   const SeasonView({super.key});
@@ -152,13 +153,17 @@ class _SeasonViewState extends State<SeasonView> with TickerProviderStateMixin {
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: StadiumBackground(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 16.0),
-          physics: const BouncingScrollPhysics(),
-          child: SafeArea(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            // const FireSparksBackground(),
+            SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 16.0),
+              physics: const BouncingScrollPhysics(),
+              child: SafeArea(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
                 // APP BAR
                 Padding(
                   padding: const EdgeInsets.only(bottom: 24.0),
@@ -407,10 +412,12 @@ class _SeasonViewState extends State<SeasonView> with TickerProviderStateMixin {
                   isLocked: true,
                 ).animate(delay: 300.ms).fade().slideY(begin: 0.1),
 
-                const SizedBox(height: 100),
-              ],
+                    const SizedBox(height: 100),
+                  ],
+                ),
+              ),
             ),
-          ),
+          ],
         ),
       ),
     );

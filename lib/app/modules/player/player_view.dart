@@ -18,7 +18,7 @@ class PlayerView extends GetView<PlayerController> {
     return Obx(() {
       final tab = controller.selectedTab.value;
       return Scaffold(
-        backgroundColor: const Color(0xFF0A0E1A),
+        backgroundColor: Colors.transparent,
         body: IndexedStack(
           index: tab,
           children: const [

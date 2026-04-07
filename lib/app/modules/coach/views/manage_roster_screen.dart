@@ -8,6 +8,8 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/widgets/stadium_background.dart';
 import '../../../core/widgets/glass_card.dart';
+import '../../../core/widgets/fire_sparks_background.dart';
+import '../../../core/components/animated_glowing_border.dart';
 import '../../../data/models/user_model.dart';
 import '../../../data/models/team_model.dart';
 
@@ -378,9 +380,13 @@ class ManageRosterScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return StadiumBackground(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+      child: Stack(
+        fit: StackFit.expand,
         children: [
+          // const FireSparksBackground(),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
           // App bar (custom, matches app style)
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
@@ -457,33 +463,44 @@ class ManageRosterScreen extends StatelessWidget {
                       onTap: () => _openAssignmentsSheet(context, a),
                       child: Row(
                         children: [
-                          Container(
-                            width: 46,
-                            height: 46,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: Colors.white.withValues(alpha: 0.08),
-                              border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
-                            ),
-                            alignment: Alignment.center,
-                            child: CircleAvatar(
-                              radius: 22,
-                              backgroundColor: Colors.transparent,
-                              backgroundImage: (a.profilePicUrl != null &&
-                                      a.profilePicUrl!.trim().isNotEmpty)
-                                  ? CachedNetworkImageProvider(a.profilePicUrl!.trim())
-                                  : null,
-                              child: (a.profilePicUrl == null ||
-                                      a.profilePicUrl!.trim().isEmpty)
-                                  ? Text(
-                                      a.name.isNotEmpty ? a.name[0].toUpperCase() : '?',
-                                      style: GoogleFonts.spaceGrotesk(
-                                        color: Colors.white,
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.w900,
-                                      ),
-                                    )
-                                  : null,
+                          AnimatedGlowingBorder(
+                            // Preserve original avatar constraints: 46x46.
+                            // Add a clean 3px glow gap around it.
+                            diameter: 54,
+                            borderWidth: 3,
+                            duration: const Duration(seconds: 4),
+                            child: SizedBox(
+                              width: 46,
+                              height: 46,
+                              child: Container(
+                                width: 46,
+                                height: 46,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: Colors.white.withValues(alpha: 0.08),
+                                  border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+                                ),
+                                alignment: Alignment.center,
+                                child: CircleAvatar(
+                                  radius: 22,
+                                  backgroundColor: Colors.transparent,
+                                  backgroundImage: (a.profilePicUrl != null &&
+                                          a.profilePicUrl!.trim().isNotEmpty)
+                                      ? CachedNetworkImageProvider(a.profilePicUrl!.trim())
+                                      : null,
+                                  child: (a.profilePicUrl == null ||
+                                          a.profilePicUrl!.trim().isEmpty)
+                                      ? Text(
+                                          a.name.isNotEmpty ? a.name[0].toUpperCase() : '?',
+                                          style: GoogleFonts.spaceGrotesk(
+                                            color: Colors.white,
+                                            fontSize: 18,
+                                            fontWeight: FontWeight.w900,
+                                          ),
+                                        )
+                                      : null,
+                                ),
+                              ),
                             ),
                           ),
                           const SizedBox(width: 14),
@@ -537,6 +554,8 @@ class ManageRosterScreen extends StatelessWidget {
                 );
               },
             ),
+          ),
+            ],
           ),
         ],
       ),

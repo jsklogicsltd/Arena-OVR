@@ -17,7 +17,8 @@ class CoachView extends GetView<CoachController> {
     return Obx(() {
       final tab = controller.selectedTab.value;
       return Scaffold(
-        backgroundColor: const Color(0xFF0A0E1A),
+        resizeToAvoidBottomInset: false,
+        backgroundColor: Colors.transparent,
         body: Stack(
           children: [
             IndexedStack(

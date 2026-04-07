@@ -14,7 +14,9 @@ class SchoolRepository {
     if (query.docs.isEmpty) {
       return null;
     }
-    return SchoolModel.fromJson(query.docs.first.data());
+    final data = Map<String, dynamic>.from(query.docs.first.data());
+    data['id'] = query.docs.first.id;
+    return SchoolModel.fromJson(data);
   }
 
   Stream<List<SchoolModel>> getSchoolsStream() {

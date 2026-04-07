@@ -6,7 +6,9 @@ class AppTheme {
   static ThemeData get darkTheme {
     return ThemeData(
       brightness: Brightness.dark,
-      scaffoldBackgroundColor: AppColors.background,
+      // Transparent so [VideoBackdrop] in main.dart shows behind all routes.
+      // Screens that need a solid fill should set Scaffold.backgroundColor explicitly.
+      scaffoldBackgroundColor: Colors.transparent,
       primaryColor: AppColors.primary,
       textTheme: GoogleFonts.spaceGroteskTextTheme(ThemeData.dark().textTheme).copyWith(
         displayLarge: GoogleFonts.bebasNeue(color: AppColors.textPrimary),

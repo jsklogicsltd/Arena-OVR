@@ -25,20 +25,20 @@ class OvrResult {
 
 /// Core OVR engine service.
 class OvrEngineService {
-  static const double _performanceWeight = 0.4;
-  static const double _classroomWeight = 0.2;
-  static const double _programWeight = 0.2;
-  static const double _standardWeight = 0.2;
+  static const double _athleteWeight = 0.4;
+  static const double _studentWeight = 0.2;
+  static const double _teammateWeight = 0.2;
+  static const double _citizenWeight = 0.2;
   static const double _ovrScale = 0.99;
   static const int _baseOvr = 50;
 
   OvrResult calculateOvr({
     required DateTime seasonStartDate,
     DateTime? currentDate,
-    required double performancePts,
-    required double classroomPts,
-    required double programPts,
-    required double standardPts,
+    required double athletePts,
+    required double studentPts,
+    required double teammatePts,
+    required double citizenPts,
   }) {
     final now = currentDate ?? DateTime.now();
     final day = calculateSeasonDay(
@@ -46,15 +46,15 @@ class OvrEngineService {
       currentDate: now,
     );
 
-    final perf = _clampPoints(performancePts);
-    final cls = _clampPoints(classroomPts);
-    final prog = _clampPoints(programPts);
-    final std = _clampPoints(standardPts);
+    final ath = _clampPoints(athletePts);
+    final stu = _clampPoints(studentPts);
+    final tm = _clampPoints(teammatePts);
+    final cit = _clampPoints(citizenPts);
 
-    final raw = ((perf * _performanceWeight) +
-            (cls * _classroomWeight) +
-            (prog * _programWeight) +
-            (std * _standardWeight)) *
+    final raw = ((ath * _athleteWeight) +
+            (stu * _studentWeight) +
+            (tm * _teammateWeight) +
+            (cit * _citizenWeight)) *
         _ovrScale;
 
     final actualOvr = (_baseOvr + raw.round()).clamp(0, 99);

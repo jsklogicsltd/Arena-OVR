@@ -9,6 +9,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../coach_controller.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/widgets/stadium_background.dart';
+import '../../../core/components/animated_glowing_border.dart';
 import '../../../routes/app_routes.dart';
 import 'manage_roster_screen.dart';
 
@@ -87,10 +88,14 @@ class _CoachSettingsViewState extends State<CoachSettingsView> {
       return Scaffold(
         backgroundColor: Colors.transparent,
         body: StadiumBackground(
-          child: SafeArea(
-            bottom: false,
-            child: Column(
-              children: [
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              // const FireSparksBackground(),
+              SafeArea(
+                bottom: false,
+                child: Column(
+                  children: [
                 // App Bar
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
@@ -141,24 +146,38 @@ class _CoachSettingsViewState extends State<CoachSettingsView> {
                                       child: Stack(
                                         clipBehavior: Clip.none,
                                         children: [
-                                          // Circle avatar
-                                          Container(
-                                            width: 88,
-                                            height: 88,
-                                            decoration: BoxDecoration(
-                                              shape: BoxShape.circle,
-                                              border: Border.all(color: AppColors.primary, width: 2),
-                                              color: Colors.white10,
-                                              image: url.isNotEmpty
-                                                  ? DecorationImage(
-                                                      image: CachedNetworkImageProvider(url),
-                                                      fit: BoxFit.cover,
-                                                    )
-                                                  : null,
+                                          // Circle avatar (wrapped with premium glow).
+                                          AnimatedGlowingBorder(
+                                            // Preserve strict sizing: original 88x88.
+                                            // Add clean 3px glow gap around it.
+                                            diameter: 94,
+                                            borderWidth: 3,
+                                            duration: const Duration(seconds: 4),
+                                            child: SizedBox(
+                                              width: 88,
+                                              height: 88,
+                                              child: Container(
+                                                decoration: BoxDecoration(
+                                                  shape: BoxShape.circle,
+                                                  border: Border.all(
+                                                      color: AppColors.primary,
+                                                      width: 2),
+                                                  color: Colors.white10,
+                                                  image: url.isNotEmpty
+                                                      ? DecorationImage(
+                                                          image:
+                                                              CachedNetworkImageProvider(url),
+                                                          fit: BoxFit.cover,
+                                                        )
+                                                      : null,
+                                                ),
+                                                child: url.isEmpty
+                                                    ? const Icon(Icons.person,
+                                                        color: Colors.white54,
+                                                        size: 40)
+                                                    : null,
+                                              ),
                                             ),
-                                            child: url.isEmpty
-                                                ? const Icon(Icons.person, color: Colors.white54, size: 40)
-                                                : null,
                                           ),
                                           // Upload-in-progress overlay
                                           if (uploading)
@@ -222,7 +241,7 @@ class _CoachSettingsViewState extends State<CoachSettingsView> {
                                   const SizedBox(height: 16),
                                   
                                   // Badges/Buttons
-                                  Container(
+                                  Obx(() => Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                                     decoration: BoxDecoration(
                                       color: AppColors.primary.withOpacity(0.2),
@@ -230,10 +249,10 @@ class _CoachSettingsViewState extends State<CoachSettingsView> {
                                       border: Border.all(color: AppColors.primary.withOpacity(0.5)),
                                     ),
                                     child: Text(
-                                      'HEAD COACH',
+                                      controller.coachRoleBadge.value,
                                       style: GoogleFonts.spaceGrotesk(color: AppColors.primary, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.0),
                                     ),
-                                  ),
+                                  )),
                                   const SizedBox(height: 12),
                                   GestureDetector(
                                     onTap: _showEditNameDialog,
@@ -318,18 +337,19 @@ class _CoachSettingsViewState extends State<CoachSettingsView> {
                               value: pushEnabled,
                               onChanged: (val) => setState(() => pushEnabled = val),
                             ),
-                            _buildDivider(),
-                            _buildSettingsSwitch(
-                              title: 'Haptic Feedback',
-                              value: hapticEnabled,
-                              onChanged: (val) => setState(() => hapticEnabled = val),
-                            ),
-                            _buildDivider(),
-                            _buildSettingsSwitch(
-                              title: 'Rating Notifications',
-                              value: ratingEnabled,
-                              onChanged: (val) => setState(() => ratingEnabled = val),
-                            ),
+                            // NOTE: Other preferences are hidden for now.
+                            // _buildDivider(),
+                            // _buildSettingsSwitch(
+                            //   title: 'Haptic Feedback',
+                            //   value: hapticEnabled,
+                            //   onChanged: (val) => setState(() => hapticEnabled = val),
+                            // ),
+                            // _buildDivider(),
+                            // _buildSettingsSwitch(
+                            //   title: 'Rating Notifications',
+                            //   value: ratingEnabled,
+                            //   onChanged: (val) => setState(() => ratingEnabled = val),
+                            // ),
                           ],
                         ).animate(delay: 200.ms).fade().slideY(begin: 0.1),
 
@@ -395,43 +415,50 @@ class _CoachSettingsViewState extends State<CoachSettingsView> {
                         // DANGER ZONE
                         _buildSectionTitle('DANGER ZONE', color: const Color(0xFFEF4444)).animate(delay: 450.ms).fade(),
                         const SizedBox(height: 12),
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(24),
-                          child: BackdropFilter(
-                            filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-                            child: Container(
-                              padding: const EdgeInsets.all(20),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.04),
-                                borderRadius: BorderRadius.circular(24),
-                                border: Border.all(color: const Color(0xFFEF4444).withOpacity(0.3), width: 1),
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            onTap: () => controller.deleteAccount(),
+                            borderRadius: BorderRadius.circular(24),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(24),
+                              child: BackdropFilter(
+                                filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+                                child: Container(
+                                  padding: const EdgeInsets.all(20),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withOpacity(0.04),
+                                    borderRadius: BorderRadius.circular(24),
+                                    border: Border.all(color: const Color(0xFFEF4444).withOpacity(0.3), width: 1),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      Text(
-                                        'Delete My Account',
-                                        style: GoogleFonts.spaceGrotesk(color: const Color(0xFFEF4444), fontSize: 14, fontWeight: FontWeight.bold),
+                                      Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Text(
+                                            'Delete My Account',
+                                            style: GoogleFonts.spaceGrotesk(color: const Color(0xFFEF4444), fontSize: 14, fontWeight: FontWeight.bold),
+                                          ),
+                                          Container(
+                                            padding: const EdgeInsets.all(4),
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFFEF4444).withOpacity(0.1),
+                                              borderRadius: BorderRadius.circular(6),
+                                            ),
+                                            child: const Icon(Icons.delete_outline, color: Color(0xFFEF4444), size: 18),
+                                          ),
+                                        ],
                                       ),
-                                      Container(
-                                        padding: const EdgeInsets.all(4),
-                                        decoration: BoxDecoration(
-                                          color: const Color(0xFFEF4444).withOpacity(0.1),
-                                          borderRadius: BorderRadius.circular(6),
-                                        ),
-                                        child: const Icon(Icons.delete_outline, color: Color(0xFFEF4444), size: 18),
+                                      const SizedBox(height: 12),
+                                      Text(
+                                        'Permanently deletes your account and profile data. Team/org records may be retained as required.',
+                                        style: GoogleFonts.inter(color: Colors.white38, fontSize: 11, height: 1.5),
                                       ),
                                     ],
                                   ),
-                                  const SizedBox(height: 12),
-                                  Text(
-                                    'This will remove you as coach. Your team data will be preserved for the organization records.',
-                                    style: GoogleFonts.inter(color: Colors.white38, fontSize: 11, height: 1.5),
-                                  ),
-                                ],
+                                ),
                               ),
                             ),
                           ),
@@ -452,8 +479,10 @@ class _CoachSettingsViewState extends State<CoachSettingsView> {
                     ),
                   ),
                 ),
-              ],
-            ),
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
       );

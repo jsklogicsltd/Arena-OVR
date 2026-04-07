@@ -8,6 +8,8 @@ import 'leaderboard_controller.dart';
 import '../player/player_controller.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/widgets/stadium_background.dart';
+import '../../core/widgets/fire_sparks_background.dart';
+import '../../core/components/animated_glowing_border.dart';
 import '../../data/models/user_model.dart';
 
 class LeaderboardView extends GetView<LeaderboardController> {
@@ -33,11 +35,15 @@ class LeaderboardView extends GetView<LeaderboardController> {
   @override
   Widget build(BuildContext context) {
     return StadiumBackground(
-      child: Column(
+      child: Stack(
+        fit: StackFit.expand,
         children: [
-          _buildAppBar(context),
-          Expanded(
-            child: Obx(() {
+          // const FireSparksBackground(),
+          Column(
+            children: [
+              _buildAppBar(context),
+              Expanded(
+                child: Obx(() {
               final pc = _tryPlayerController();
               if (pc != null && pc.athlete.value?.role == 'athlete') {
                 // Rebuild when season / profile loads (same as athlete dashboard OVR gate).
@@ -55,8 +61,10 @@ class LeaderboardView extends GetView<LeaderboardController> {
                   child: CircularProgressIndicator(color: AppColors.tierGold),
                 );
               }
-              return _buildBody(context);
-            }),
+                  return _buildBody(context);
+                }),
+              ),
+            ],
           ),
         ],
       ),
@@ -368,33 +376,42 @@ class LeaderboardView extends GetView<LeaderboardController> {
             clipBehavior: Clip.none,
             alignment: Alignment.center,
             children: [
-              Container(
-                width: size,
-                height: size,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(color: borderColor, width: is1 ? 3 : 2.5),
-                  boxShadow: is1
-                      ? [
-                          BoxShadow(
-                            color: _rank1Border.withValues(alpha: 0.4),
-                            blurRadius: 12,
-                            spreadRadius: 0,
-                          ),
-                        ]
-                      : null,
-                ),
-                child: ClipOval(
-                  child: u.profilePicUrl != null && u.profilePicUrl!.isNotEmpty
-                      ? CachedNetworkImage(
-                          imageUrl: u.profilePicUrl!,
-                          fit: BoxFit.cover,
-                          width: size,
-                          height: size,
-                          placeholder: (_, __) => _avatarPlaceholder(size, borderColor),
-                          errorWidget: (_, __, ___) => _avatarPlaceholder(size, borderColor),
-                        )
-                      : _avatarPlaceholder(size, borderColor),
+              AnimatedGlowingBorder(
+                diameter: size + 6,
+                borderWidth: 3,
+                duration: const Duration(seconds: 4),
+                child: SizedBox(
+                  width: size,
+                  height: size,
+                  child: Container(
+                    width: size,
+                    height: size,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: borderColor, width: is1 ? 3 : 2.5),
+                      boxShadow: is1
+                          ? [
+                              BoxShadow(
+                                color: _rank1Border.withValues(alpha: 0.4),
+                                blurRadius: 12,
+                                spreadRadius: 0,
+                              ),
+                            ]
+                          : null,
+                    ),
+                    child: ClipOval(
+                      child: u.profilePicUrl != null && u.profilePicUrl!.isNotEmpty
+                          ? CachedNetworkImage(
+                              imageUrl: u.profilePicUrl!,
+                              fit: BoxFit.cover,
+                              width: size,
+                              height: size,
+                              placeholder: (_, __) => _avatarPlaceholder(size, borderColor),
+                              errorWidget: (_, __, ___) => _avatarPlaceholder(size, borderColor),
+                            )
+                          : _avatarPlaceholder(size, borderColor),
+                    ),
+                  ),
                 ),
               ),
               Positioned(
@@ -526,27 +543,36 @@ class LeaderboardView extends GetView<LeaderboardController> {
             clipBehavior: Clip.none,
             alignment: Alignment.center,
             children: [
-              Container(
-                width: circleSize,
-                height: circleSize,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(color: borderColor, width: 2.5),
-                ),
-                child: ClipOval(
-                  child: SizedBox(
+              AnimatedGlowingBorder(
+                diameter: circleSize + 6,
+                borderWidth: 3,
+                duration: const Duration(seconds: 4),
+                child: SizedBox(
+                  width: circleSize,
+                  height: circleSize,
+                  child: Container(
                     width: circleSize,
                     height: circleSize,
-                    child: u.profilePicUrl != null && u.profilePicUrl!.isNotEmpty
-                        ? CachedNetworkImage(
-                            imageUrl: u.profilePicUrl!,
-                            fit: BoxFit.cover,
-                            width: circleSize,
-                            height: circleSize,
-                            placeholder: (_, __) => _avatarPlaceholder(circleSize, borderColor),
-                            errorWidget: (_, __, ___) => _avatarPlaceholder(circleSize, borderColor),
-                          )
-                        : _avatarPlaceholder(circleSize, borderColor),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: borderColor, width: 2.5),
+                    ),
+                    child: ClipOval(
+                      child: SizedBox(
+                        width: circleSize,
+                        height: circleSize,
+                        child: u.profilePicUrl != null && u.profilePicUrl!.isNotEmpty
+                            ? CachedNetworkImage(
+                                imageUrl: u.profilePicUrl!,
+                                fit: BoxFit.cover,
+                                width: circleSize,
+                                height: circleSize,
+                                placeholder: (_, __) => _avatarPlaceholder(circleSize, borderColor),
+                                errorWidget: (_, __, ___) => _avatarPlaceholder(circleSize, borderColor),
+                              )
+                            : _avatarPlaceholder(circleSize, borderColor),
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -601,19 +627,19 @@ class LeaderboardView extends GetView<LeaderboardController> {
     );
   }
 
-  // Category Leaders: Performance, Classroom, Program, Standard
-  static const Color _perfBg = Color(0x4D1E3A8A);
-  static const Color _perfBorder = Color(0x4D3B82F6);
-  static const Color _perfAccent = Color(0xFF93C5FD);
-  static const Color _classBg = Color(0x4D14532D);
-  static const Color _classBorder = Color(0x4D22C55E);
-  static const Color _classAccent = Color(0xFF4ADE80);
-  static const Color _progBg = Color(0x4D4C1D95);
-  static const Color _progBorder = Color(0x4D7C3AED);
-  static const Color _progAccent = Color(0xFFA78BFA);
-  static const Color _stdBg = Color(0x4D78350F);
-  static const Color _stdBorder = Color(0x4DD97706);
-  static const Color _stdAccent = Color(0xFFFB923C);
+  // Category Leaders: Athlete, Student, Teammate, Citizen
+  static const Color _athBg = Color(0x4D1E3A8A);
+  static const Color _athBorder = Color(0x4D3B82F6);
+  static const Color _athAccent = Color(0xFF93C5FD);
+  static const Color _stuBg = Color(0x4D14532D);
+  static const Color _stuBorder = Color(0x4D22C55E);
+  static const Color _stuAccent = Color(0xFF4ADE80);
+  static const Color _tmBg = Color(0x4D4C1D95);
+  static const Color _tmBorder = Color(0x4D7C3AED);
+  static const Color _tmAccent = Color(0xFFA78BFA);
+  static const Color _citBg = Color(0x4D78350F);
+  static const Color _citBorder = Color(0x4DD97706);
+  static const Color _citAccent = Color(0xFFFB923C);
 
   Widget _buildCategoryLeaders() {
     if (controller.ranked.isEmpty) return const SizedBox.shrink();
@@ -634,29 +660,29 @@ class LeaderboardView extends GetView<LeaderboardController> {
           children: [
             Expanded(
               child: _buildCategoryCard(
-                title: 'PERFORMANCE',
+                title: 'ATHLETE',
                 icon: Icons.fitness_center_rounded,
-                backgroundColor: _perfBg,
-                borderColor: _perfBorder,
-                accentColor: _perfAccent,
-                leaderName: controller.categoryLeader('Performance') != null
-                    ? _shortName(controller.categoryLeader('Performance')!.name)
+                backgroundColor: _athBg,
+                borderColor: _athBorder,
+                accentColor: _athAccent,
+                leaderName: controller.categoryLeader('Athlete') != null
+                    ? _shortName(controller.categoryLeader('Athlete')!.name)
                     : '--',
-                points: controller.categoryLeaderPoints('Performance').round(),
+                points: controller.categoryLeaderPoints('Athlete').round(),
               ),
             ),
             const SizedBox(width: 10),
             Expanded(
               child: _buildCategoryCard(
-                title: 'CLASSROOM',
+                title: 'STUDENT',
                 icon: Icons.school_rounded,
-                backgroundColor: _classBg,
-                borderColor: _classBorder,
-                accentColor: _classAccent,
-                leaderName: controller.categoryLeader('Classroom') != null
-                    ? _shortName(controller.categoryLeader('Classroom')!.name)
+                backgroundColor: _stuBg,
+                borderColor: _stuBorder,
+                accentColor: _stuAccent,
+                leaderName: controller.categoryLeader('Student') != null
+                    ? _shortName(controller.categoryLeader('Student')!.name)
                     : '--',
-                points: controller.categoryLeaderPoints('Classroom').round(),
+                points: controller.categoryLeaderPoints('Student').round(),
               ),
             ),
           ],
@@ -666,29 +692,29 @@ class LeaderboardView extends GetView<LeaderboardController> {
           children: [
             Expanded(
               child: _buildCategoryCard(
-                title: 'PROGRAM',
+                title: 'TEAMMATE',
                 icon: Icons.handshake_rounded,
-                backgroundColor: _progBg,
-                borderColor: _progBorder,
-                accentColor: _progAccent,
-                leaderName: controller.categoryLeader('Program') != null
-                    ? _shortName(controller.categoryLeader('Program')!.name)
+                backgroundColor: _tmBg,
+                borderColor: _tmBorder,
+                accentColor: _tmAccent,
+                leaderName: controller.categoryLeader('Teammate') != null
+                    ? _shortName(controller.categoryLeader('Teammate')!.name)
                     : '--',
-                points: controller.categoryLeaderPoints('Program').round(),
+                points: controller.categoryLeaderPoints('Teammate').round(),
               ),
             ),
             const SizedBox(width: 10),
             Expanded(
               child: _buildCategoryCard(
-                title: 'STANDARD',
+                title: 'CITIZEN',
                 icon: Icons.shield_rounded,
-                backgroundColor: _stdBg,
-                borderColor: _stdBorder,
-                accentColor: _stdAccent,
-                leaderName: controller.categoryLeader('Standard') != null
-                    ? _shortName(controller.categoryLeader('Standard')!.name)
+                backgroundColor: _citBg,
+                borderColor: _citBorder,
+                accentColor: _citAccent,
+                leaderName: controller.categoryLeader('Citizen') != null
+                    ? _shortName(controller.categoryLeader('Citizen')!.name)
                     : '--',
-                points: controller.categoryLeaderPoints('Standard').round(),
+                points: controller.categoryLeaderPoints('Citizen').round(),
               ),
             ),
           ],
@@ -853,22 +879,31 @@ class LeaderboardView extends GetView<LeaderboardController> {
             ),
           ),
           const SizedBox(width: 12),
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(color: AppColors.tierSilver.withValues(alpha: 0.5), width: 1),
-            ),
-            child: ClipOval(
-              child: u.profilePicUrl != null && u.profilePicUrl!.isNotEmpty
-                  ? CachedNetworkImage(
-                      imageUrl: u.profilePicUrl!,
-                      fit: BoxFit.cover,
-                      placeholder: (_, __) => _avatarPlaceholder(40, AppColors.tierSilver),
-                      errorWidget: (_, __, ___) => _avatarPlaceholder(40, AppColors.tierSilver),
-                    )
-                  : _avatarPlaceholder(40, AppColors.tierSilver),
+          AnimatedGlowingBorder(
+            diameter: 46,
+            borderWidth: 3,
+            duration: const Duration(seconds: 4),
+            child: SizedBox(
+              width: 40,
+              height: 40,
+              child: Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(color: AppColors.tierSilver.withValues(alpha: 0.5), width: 1),
+                ),
+                child: ClipOval(
+                  child: u.profilePicUrl != null && u.profilePicUrl!.isNotEmpty
+                      ? CachedNetworkImage(
+                          imageUrl: u.profilePicUrl!,
+                          fit: BoxFit.cover,
+                          placeholder: (_, __) => _avatarPlaceholder(40, AppColors.tierSilver),
+                          errorWidget: (_, __, ___) => _avatarPlaceholder(40, AppColors.tierSilver),
+                        )
+                      : _avatarPlaceholder(40, AppColors.tierSilver),
+                ),
+              ),
             ),
           ),
           const SizedBox(width: 12),

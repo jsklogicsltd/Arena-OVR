@@ -8,6 +8,7 @@ import 'settings_controller.dart';
 import '../player/player_controller.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/widgets/stadium_background.dart';
+import '../../core/components/animated_glowing_border.dart';
 import '../../data/models/user_model.dart';
 
 class SettingsView extends GetView<SettingsController> {
@@ -18,7 +19,9 @@ class SettingsView extends GetView<SettingsController> {
   void _showEditNameDialog() {
     final player = Get.find<PlayerController>();
     final text = TextEditingController(text: player.athlete.value?.name ?? '');
-    final jersey = TextEditingController(text: player.athlete.value?.jerseyNumber ?? '');
+    final jersey = TextEditingController(
+        text: player.athlete.value?.displayJerseyNumber ?? '0');
+    final position = TextEditingController(text: player.athlete.value?.positionGroup ?? '');
     Get.dialog(
       AlertDialog(
         backgroundColor: const Color(0xFF101A24),
@@ -65,6 +68,24 @@ class SettingsView extends GetView<SettingsController> {
                 ),
               ),
             ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: position,
+              maxLength: 24,
+              style: GoogleFonts.spaceGrotesk(color: Colors.white),
+              decoration: InputDecoration(
+                hintText: 'Enter position (optional)',
+                hintStyle: GoogleFonts.spaceGrotesk(color: Colors.white54),
+                enabledBorder: OutlineInputBorder(
+                  borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                focusedBorder: const OutlineInputBorder(
+                  borderSide: BorderSide(color: AppColors.primary),
+                  borderRadius: BorderRadius.all(Radius.circular(10)),
+                ),
+              ),
+            ),
           ],
         ),
         actions: [
@@ -80,6 +101,7 @@ class SettingsView extends GetView<SettingsController> {
                         await player.updateAthleteProfile(
                           rawName: text.text,
                           rawJerseyNumber: jersey.text,
+                          rawPositionGroup: position.text,
                         );
                         Get.back(closeOverlays: true);
                       },
@@ -102,51 +124,61 @@ class SettingsView extends GetView<SettingsController> {
       Get.put(SettingsController());
     }
     return StadiumBackground(
-      child: Column(
+      child: Stack(
+        fit: StackFit.expand,
         children: [
-          _buildAppBar(context),
-          Expanded(
-            child: SingleChildScrollView(
-              physics: const BouncingScrollPhysics(),
-              padding: const EdgeInsets.fromLTRB(20, 8, 20, 100),
-              child: Obx(() {
-                final player = Get.find<PlayerController>();
-                final athlete = player.athlete.value;
-                final team = player.team.value;
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    _buildProfileCard(athlete),
-                    const SizedBox(height: 20),
-                    _buildSectionLabel('PREFERENCES'),
-                    const SizedBox(height: 8),
-                    _buildPreferencesCard(),
-                    const SizedBox(height: 20),
-                    _buildSectionLabel('TEAM INFO'),
-                    const SizedBox(height: 8),
-                    _buildTeamInfoCard(team, athlete),
-                    const SizedBox(height: 20),
-                    _buildSectionLabel('ACCOUNT'),
-                    const SizedBox(height: 8),
-                    _buildAccountCard(),
-                    const SizedBox(height: 20),
-                    _buildSectionLabel('DANGER ZONE', isDanger: true),
-                    const SizedBox(height: 8),
-                    _buildDangerZoneCard(),
-                    const SizedBox(height: 28),
-                    Text(
-                      _appVersion,
-                      textAlign: TextAlign.center,
-                      style: GoogleFonts.spaceGrotesk(
-                        color: Colors.white38,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                );
-              }),
-            ),
+          // const FireSparksBackground(),
+          Column(
+            children: [
+              _buildAppBar(context),
+              Expanded(
+                child: SingleChildScrollView(
+                  physics: const BouncingScrollPhysics(),
+                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 100),
+                  child: Obx(() {
+                    final player = Get.find<PlayerController>();
+                    final athlete = player.athlete.value;
+                    final team = player.team.value;
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        _buildProfileCard(athlete),
+                        const SizedBox(height: 20),
+                        _buildSectionLabel('PHYSICAL PROFILE'),
+                        const SizedBox(height: 8),
+                        _buildPhysicalProfileCard(athlete),
+                        const SizedBox(height: 20),
+                        _buildSectionLabel('PREFERENCES'),
+                        const SizedBox(height: 8),
+                        _buildPreferencesCard(),
+                        const SizedBox(height: 20),
+                        _buildSectionLabel('TEAM INFO'),
+                        const SizedBox(height: 8),
+                        _buildTeamInfoCard(team, athlete),
+                        const SizedBox(height: 20),
+                        _buildSectionLabel('ACCOUNT'),
+                        const SizedBox(height: 8),
+                        _buildAccountCard(),
+                        const SizedBox(height: 20),
+                        _buildSectionLabel('DANGER ZONE', isDanger: true),
+                        const SizedBox(height: 8),
+                        _buildDangerZoneCard(),
+                        const SizedBox(height: 28),
+                        Text(
+                          _appVersion,
+                          textAlign: TextAlign.center,
+                          style: GoogleFonts.spaceGrotesk(
+                            color: Colors.white38,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    );
+                  }),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -196,7 +228,8 @@ class SettingsView extends GetView<SettingsController> {
     final player = Get.find<PlayerController>();
     final name = athlete?.name ?? 'Marcus Johnson';
     final email = athlete?.email ?? 'marcus@school.edu';
-    final jersey = athlete?.jerseyNumber ?? '7';
+    // Default to 0 until explicitly set by the athlete.
+    final jersey = athlete == null ? '0' : athlete.displayJerseyNumber;
     final position = athlete?.positionGroup ?? 'QUARTERBACK';
     final photoUrl = athlete?.profilePicUrl;
 
@@ -227,62 +260,77 @@ class SettingsView extends GetView<SettingsController> {
               children: [
                 GestureDetector(
                   onTap: player.updatePhoto,
-                  child: Stack(
-                  clipBehavior: Clip.none,
-                  alignment: Alignment.center,
-                  children: [
-                    Container(
-                      width: 100,
-                      height: 100,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(color: AppColors.tierGold, width: 3),
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppColors.tierGold.withValues(alpha: 0.3),
-                            blurRadius: 12,
-                            spreadRadius: 0,
-                          ),
-                        ],
-                      ),
-                      child: ClipOval(
-                        child: photoUrl != null && photoUrl.isNotEmpty
-                            ? CachedNetworkImage(
-                                imageUrl: photoUrl,
-                                fit: BoxFit.cover,
-                                width: 100,
-                                height: 100,
-                                placeholder: (_, __) => _avatarPlaceholder(100),
-                                errorWidget: (_, __, ___) => _avatarPlaceholder(100),
-                              )
-                            : _avatarPlaceholder(100),
-                      ),
-                    ),
-                    // Upload spinner overlay
-                    Obx(() {
-                      if (!player.isUploadingPhoto.value) return const SizedBox.shrink();
-                      return Positioned.fill(
-                        child: ClipOval(
-                          child: Container(
-                            color: Colors.black54,
-                            child: const Center(
-                              child: SizedBox(
-                                width: 30,
-                                height: 30,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2.5,
-                                  color: Colors.white,
+                  child: Obx(() {
+                    final uploading = player.isUploadingPhoto.value;
+                    return Stack(
+                      clipBehavior: Clip.none,
+                      alignment: Alignment.center,
+                      children: [
+                        AnimatedGlowingBorder(
+                          diameter: 106,
+                          borderWidth: 3,
+                          duration: const Duration(seconds: 4),
+                          child: SizedBox(
+                            width: 100,
+                            height: 100,
+                            child: Stack(
+                              fit: StackFit.expand,
+                              children: [
+                                Container(
+                                  width: 100,
+                                  height: 100,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                        color: AppColors.tierGold, width: 3),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: AppColors.tierGold
+                                            .withValues(alpha: 0.3),
+                                        blurRadius: 12,
+                                        spreadRadius: 0,
+                                      ),
+                                    ],
+                                  ),
+                                  child: ClipOval(
+                                    child: photoUrl != null &&
+                                            photoUrl.isNotEmpty
+                                        ? CachedNetworkImage(
+                                            imageUrl: photoUrl,
+                                            fit: BoxFit.cover,
+                                            width: 100,
+                                            height: 100,
+                                            placeholder: (_, __) =>
+                                                _avatarPlaceholder(100),
+                                            errorWidget: (_, __, ___) =>
+                                                _avatarPlaceholder(100),
+                                          )
+                                        : _avatarPlaceholder(100),
+                                  ),
                                 ),
-                              ),
+                                if (uploading)
+                                  Container(
+                                    decoration: const BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      color: Colors.black54,
+                                    ),
+                                    child: const Center(
+                                      child: SizedBox(
+                                        width: 30,
+                                        height: 30,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2.5,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                              ],
                             ),
                           ),
                         ),
-                      );
-                    }),
-                    // Camera badge
-                    Obx(() => player.isUploadingPhoto.value
-                        ? const SizedBox.shrink()
-                        : Positioned(
+                        if (!uploading)
+                          Positioned(
                             right: -4,
                             bottom: -4,
                             child: Container(
@@ -291,7 +339,8 @@ class SettingsView extends GetView<SettingsController> {
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
                                 color: AppColors.primary,
-                                border: Border.all(color: Colors.white, width: 1.5),
+                                border: Border.all(
+                                    color: Colors.white, width: 1.5),
                                 boxShadow: [
                                   BoxShadow(
                                     color: Colors.black.withValues(alpha: 0.3),
@@ -300,11 +349,13 @@ class SettingsView extends GetView<SettingsController> {
                                   ),
                                 ],
                               ),
-                              child: const Icon(Icons.camera_alt_rounded, color: Colors.white, size: 16),
+                              child: const Icon(Icons.camera_alt_rounded,
+                                  color: Colors.white, size: 16),
                             ),
-                          )),
-                  ],
-                ),
+                          ),
+                      ],
+                    );
+                  }),
                 ),
                 const SizedBox(height: 16),
                 Text(
@@ -364,6 +415,164 @@ class SettingsView extends GetView<SettingsController> {
     );
   }
 
+  Widget _buildPhysicalProfileCard(UserModel? athlete) {
+    final player = Get.find<PlayerController>();
+
+    final gradeCtrl = TextEditingController(
+      text: athlete?.grade?.toString() ?? '',
+    );
+    final heightCtrl = TextEditingController(
+      text: athlete?.heightInches?.toString() ?? '',
+    );
+    final weightCtrl = TextEditingController(
+      text: athlete?.weightLbs?.toString() ?? '',
+    );
+
+    final currentPower = athlete?.powerProfile;
+    final currentSpeed = athlete?.speedProfile;
+
+    return _buildGlassCard(
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: _numericField(gradeCtrl, 'GRADE', hint: '9–12'),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _numericField(heightCtrl, 'HEIGHT (IN)', hint: 'e.g. 70'),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _numericField(weightCtrl, 'WEIGHT (LBS)', hint: 'e.g. 175'),
+            ),
+          ],
+        ),
+        if (currentPower != null || currentSpeed != null) ...[
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              if (currentPower != null)
+                _profileChip('POWER', currentPower.toUpperCase(), AppColors.primary),
+              if (currentPower != null && currentSpeed != null)
+                const SizedBox(width: 8),
+              if (currentSpeed != null)
+                _profileChip('SPEED', currentSpeed.toUpperCase(), AppColors.tierGold),
+            ],
+          ),
+        ],
+        const SizedBox(height: 16),
+        Obx(() => SizedBox(
+              width: double.infinity,
+              height: 44,
+              child: ElevatedButton(
+                onPressed: player.isSavingPhysical.value
+                    ? null
+                    : () {
+                        final g = int.tryParse(gradeCtrl.text.trim());
+                        final h = int.tryParse(heightCtrl.text.trim());
+                        final w = int.tryParse(weightCtrl.text.trim());
+                        if (g == null || h == null || w == null) {
+                          Get.snackbar('Error', 'Enter valid numbers for all fields',
+                            snackPosition: SnackPosition.BOTTOM,
+                            backgroundColor: Colors.red.withValues(alpha: 0.85),
+                            colorText: Colors.white);
+                          return;
+                        }
+                        FocusManager.instance.primaryFocus?.unfocus();
+                        player.updatePhysicalProfile(
+                          grade: g,
+                          heightInches: h,
+                          weightLbs: w,
+                        );
+                      },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  disabledBackgroundColor: AppColors.primary.withValues(alpha: 0.4),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: player.isSavingPhysical.value
+                    ? const SizedBox(
+                        width: 20, height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2, color: Colors.white))
+                    : Text(
+                        'SAVE PHYSICAL PROFILE',
+                        style: GoogleFonts.spaceGrotesk(
+                          color: Colors.white,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.8,
+                        ),
+                      ),
+              ),
+            )),
+      ],
+    );
+  }
+
+  Widget _numericField(TextEditingController ctrl, String label, {String hint = ''}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: GoogleFonts.spaceGrotesk(
+            color: Colors.white54,
+            fontSize: 10,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0.8,
+          ),
+        ),
+        const SizedBox(height: 6),
+        TextField(
+          controller: ctrl,
+          keyboardType: TextInputType.number,
+          style: GoogleFonts.spaceGrotesk(
+            color: Colors.white,
+            fontSize: 15,
+            fontWeight: FontWeight.w600,
+          ),
+          decoration: InputDecoration(
+            hintText: hint,
+            hintStyle: GoogleFonts.spaceGrotesk(color: Colors.white24, fontSize: 14),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            enabledBorder: OutlineInputBorder(
+              borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.15)),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderSide: const BorderSide(color: AppColors.primary),
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _profileChip(String label, String value, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withValues(alpha: 0.35)),
+      ),
+      child: Text(
+        '$label: $value',
+        style: GoogleFonts.spaceGrotesk(
+          color: color,
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.5,
+        ),
+      ),
+    );
+  }
+
   Widget _avatarPlaceholder(double size) {
     return Container(
       color: Colors.white12,
@@ -412,8 +621,9 @@ class SettingsView extends GetView<SettingsController> {
     return _buildGlassCard(
       children: [
         _buildSwitchRow('Push Notifications', controller.pushNotifications, controller.togglePushNotifications, isOn: true),
-        Divider(height: 24, color: Colors.white.withValues(alpha: 0.1)),
-        _buildSwitchRow('Haptic Feedback', controller.hapticFeedback, controller.toggleHapticFeedback, isOn: false),
+        // NOTE: Other preferences are hidden for now.
+        // Divider(height: 24, color: Colors.white.withValues(alpha: 0.1)),
+        // _buildSwitchRow('Haptic Feedback', controller.hapticFeedback, controller.toggleHapticFeedback, isOn: false),
       ],
     );
   }

@@ -14,6 +14,7 @@ import '../../data/models/season_model.dart';
 import '../../data/models/transaction_model.dart';
 import '../../data/repositories/rating_repository.dart';
 import '../../core/services/ovr_engine_service.dart';
+import '../../scoring_engine/profile_assignment.dart';
 import '../leaderboard/leaderboard_controller.dart';
 import '../feed/feed_controller.dart';
 import '../settings/settings_controller.dart';
@@ -35,6 +36,7 @@ class PlayerController extends GetxController {
   final RxInt  selectedTab       = 0.obs;
   final RxBool isUploadingPhoto  = false.obs;
   final RxBool isUpdatingName    = false.obs;
+  final RxBool isSavingPhysical  = false.obs;
 
   final ImagePicker _picker = ImagePicker();
 
@@ -58,14 +60,32 @@ class PlayerController extends GetxController {
   }
 
   bool get isOvrTimingReady {
+    if (athlete.value == null) return false;
     if (season.value?.startDate != null) return true;
-    if (athlete.value?.ovrDay != null) return true;
+    if (athlete.value!.ovrDay != null) return true;
     return false;
   }
 
+  /// True when day/OVR can be shown without flipping (e.g. not ??? then number).
+  /// Waits for team (if [UserModel.teamId] is set) and season (if team has [currentSeasonId])
+  /// so [_daysElapsed] / visibility does not change when those streams catch up.
+  bool get isOvrDisplayResolved {
+    if (athlete.value == null) return false;
+    final tid = athlete.value!.teamId;
+    if (tid != null && tid.isNotEmpty) {
+      if (team.value == null) return false;
+      final sid = team.value!.currentSeasonId;
+      if (sid != null && sid.isNotEmpty) {
+        if (season.value == null) return false;
+      }
+    }
+    return isOvrTimingReady;
+  }
+
   int? get displayedOvr {
-    final raw = athlete.value?.actualOvr ?? athlete.value?.ovr;
-    if (raw == null) return null;
+    final a = athlete.value;
+    if (a == null) return null;
+    final raw = a.finalOvr;
     if (_daysElapsed <= 1) return null; // Day 1 locked
     return math.min(raw, currentPhaseCap);
   }
@@ -108,7 +128,8 @@ class PlayerController extends GetxController {
     if (streak.isEmpty) return '';
     int maxVal = 0;
     String bestKey = '';
-    for (final key in ['Performance', 'Class', 'Program', 'Standard']) {
+    for (final key in ['Athlete', 'Student', 'Teammate', 'Citizen',
+                        'Performance', 'Class', 'Program', 'Standard']) {
       final v = streak[key];
       if (v is int && v > maxVal) {
         maxVal = v;
@@ -121,11 +142,16 @@ class PlayerController extends GetxController {
 
   String _catLabel(String cat) {
     switch (cat.toLowerCase()) {
+      case 'athlete':
+      case 'performance': return 'Athlete';
+      case 'student':
       case 'class':
-      case 'classroom': return 'Classroom';
-      case 'program':   return 'Program';
-      case 'standard':  return 'Standard';
-      default:          return cat;
+      case 'classroom':   return 'Student';
+      case 'teammate':
+      case 'program':     return 'Teammate';
+      case 'citizen':
+      case 'standard':    return 'Citizen';
+      default:            return cat;
     }
   }
 
@@ -246,23 +272,23 @@ class PlayerController extends GetxController {
       email: 'marcus@example.com',
       name: 'Marcus Johnson',
       role: 'athlete',
-      jerseyNumber: '7',
+      jerseyNumber: '0',
       positionGroup: 'Quarterback',
       ovr: 92,
       rank: 1,
       previousRank: 2,
       badges: ['rising_star', 'team_player'],
       currentRating: {
-        'Performance': 38.0,
-        'Class': 17.0,
-        'Program': 14.0,
-        'Standard': 15.0,
+        'Athlete': 38.0,
+        'Student': 17.0,
+        'Teammate': 14.0,
+        'Citizen': 15.0,
       },
       currentStreak: {
-        'Standard': 14,
-        'Standard_lastDate': DateTime.now().toIso8601String().split('T')[0],
-        'Performance': 5,
-        'Performance_lastDate': DateTime.now().toIso8601String().split('T')[0],
+        'Citizen': 14,
+        'Citizen_lastDate': DateTime.now().toIso8601String().split('T')[0],
+        'Athlete': 5,
+        'Athlete_lastDate': DateTime.now().toIso8601String().split('T')[0],
       },
     );
     team.value = TeamModel(
@@ -294,7 +320,7 @@ class PlayerController extends GetxController {
     TransactionModel(
       id: '1', athleteId: 'mock', coachId: 'coach1',
       teamId: 'mock', schoolId: 'mock', seasonId: 'mock',
-      category: 'Performance', value: 3,
+      category: 'Athlete', value: 3,
       note: 'Exceptional drive and accuracy on the final quarter.',
       type: 'RATING',
       createdAt: DateTime.now().subtract(const Duration(hours: 2)),
@@ -302,7 +328,7 @@ class PlayerController extends GetxController {
     TransactionModel(
       id: '2', athleteId: 'mock', coachId: 'coach1',
       teamId: 'mock', schoolId: 'mock', seasonId: 'mock',
-      category: 'Standard', value: -1,
+      category: 'Citizen', value: -1,
       note: 'Late arrival to recovery session.',
       type: 'RATING',
       createdAt: DateTime.now().subtract(const Duration(days: 1)),
@@ -310,7 +336,7 @@ class PlayerController extends GetxController {
     TransactionModel(
       id: '3', athleteId: 'mock', coachId: 'coach1',
       teamId: 'mock', schoolId: 'mock', seasonId: 'mock',
-      category: 'Program', value: 5,
+      category: 'Teammate', value: 5,
       note: 'Strong team effort during practice.',
       type: 'RATING',
       createdAt: DateTime.now().subtract(const Duration(days: 3)),
@@ -318,7 +344,7 @@ class PlayerController extends GetxController {
     TransactionModel(
       id: '4', athleteId: 'mock', coachId: 'coach1',
       teamId: 'mock', schoolId: 'mock', seasonId: 'mock',
-      category: 'Class', value: 2,
+      category: 'Student', value: 2,
       note: 'Perfect attendance this week.',
       type: 'RATING',
       createdAt: DateTime.now().subtract(const Duration(days: 4)),
@@ -375,10 +401,12 @@ class PlayerController extends GetxController {
   Future<void> updateAthleteProfile({
     required String rawName,
     required String rawJerseyNumber,
+    String? rawPositionGroup,
   }) async {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     final name = rawName.trim();
     final jersey = rawJerseyNumber.trim();
+    final position = (rawPositionGroup ?? '').trim();
     if (uid == null) return;
     if (name.isEmpty) {
       Get.snackbar(
@@ -392,12 +420,19 @@ class PlayerController extends GetxController {
 
     try {
       isUpdatingName.value = true;
-      await _firestore.collection('users').doc(uid).update({
+      final updates = <String, dynamic>{
         'name': name,
         'jerseyNumber': jersey,
-      });
+        // If the user cleared the field, explicitly overwrite the old value.
+        'positionGroup': position.isEmpty ? FieldValue.delete() : position,
+      };
+      await _firestore.collection('users').doc(uid).update(updates);
       await FirebaseAuth.instance.currentUser?.updateDisplayName(name);
-      athlete.value = athlete.value?.copyWith(name: name, jerseyNumber: jersey);
+      athlete.value = athlete.value?.copyWith(
+        name: name,
+        jerseyNumber: jersey,
+        positionGroup: position.isEmpty ? null : position,
+      );
       Get.snackbar(
         'Done', 'Profile updated',
         snackPosition: SnackPosition.BOTTOM,
@@ -416,10 +451,79 @@ class PlayerController extends GetxController {
     }
   }
 
-  void logout() async {
+  /// Saves grade, height, weight and auto-computed power/speed profiles.
+  Future<void> updatePhysicalProfile({
+    required int grade,
+    required int heightInches,
+    required int weightLbs,
+  }) async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+
+    if (grade < 9 || grade > 12) {
+      Get.snackbar('Error', 'Grade must be 9–12',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.red.withValues(alpha: 0.85),
+        colorText: Colors.white);
+      return;
+    }
+    if (heightInches <= 0 || weightLbs <= 0) {
+      Get.snackbar('Error', 'Height and weight must be positive',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.red.withValues(alpha: 0.85),
+        colorText: Colors.white);
+      return;
+    }
+
+    try {
+      isSavingPhysical.value = true;
+
+      final power = assignPowerProfile(heightInches, weightLbs);
+      final speed = assignSpeedProfile(heightInches, weightLbs);
+
+      final data = <String, dynamic>{
+        'grade': grade,
+        'heightInches': heightInches,
+        'weightLbs': weightLbs,
+        'powerProfile': power.name,
+        'speedProfile': speed.name,
+      };
+
+      await _firestore.collection('users').doc(uid).update(data);
+
+      athlete.value = athlete.value?.copyWith(
+        grade: grade,
+        heightInches: heightInches,
+        weightLbs: weightLbs,
+        powerProfile: power.name,
+        speedProfile: speed.name,
+      );
+
+      Get.snackbar('Done', 'Physical profile saved — '
+          '${power.name.toUpperCase()} power, '
+          '${speed.name.toUpperCase()} speed',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.green.withValues(alpha: 0.85),
+        colorText: Colors.white);
+    } catch (e) {
+      Get.snackbar('Error', 'Failed to save physical profile: $e',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.red.withValues(alpha: 0.85),
+        colorText: Colors.white);
+    } finally {
+      isSavingPhysical.value = false;
+    }
+  }
+
+  /// Stops Firestore listeners (e.g. before account deletion without full logout).
+  void cancelStreams() {
     _userSub?.cancel();
     _teamSub?.cancel();
     _seasonSub?.cancel();
+  }
+
+  void logout() async {
+    cancelStreams();
     await FirebaseAuth.instance.signOut();
     Get.delete<PlayerController>(force: true);
     Get.offAllNamed(Routes.AUTH);

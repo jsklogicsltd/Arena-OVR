@@ -28,23 +28,38 @@ class LeaderboardController extends GetxController {
   int get totalPoints {
     return ranked.fold<int>(0, (sum, u) {
       final r = u.currentRating;
-      final p = (r['Performance'] ?? 0) as num;
-      final c = (r['Class'] ?? 0) as num;
-      final prog = (r['Program'] ?? 0) as num;
-      final s = (r['Standard'] ?? 0) as num;
-      return sum + (p + c + prog + s).round();
+      final a = ((r['Athlete'] ?? r['Performance'] ?? 0) as num);
+      final s = ((r['Student'] ?? r['Class'] ?? 0) as num);
+      final t = ((r['Teammate'] ?? r['Program'] ?? 0) as num);
+      final c = ((r['Citizen'] ?? r['Standard'] ?? 0) as num);
+      return sum + (a + s + t + c).round();
     });
+  }
+
+  static const _categoryAliases = {
+    'Athlete': ['Athlete', 'Performance'],
+    'Student': ['Student', 'Class', 'Classroom'],
+    'Teammate': ['Teammate', 'Program'],
+    'Citizen': ['Citizen', 'Standard'],
+  };
+
+  double _categoryValue(UserModel u, String categoryKey) {
+    final aliases = _categoryAliases[categoryKey] ?? [categoryKey];
+    for (final k in aliases) {
+      final v = u.currentRating[k];
+      if (v != null) return (v as num).toDouble();
+    }
+    return 0;
   }
 
   UserModel? categoryLeader(String categoryKey) {
     if (ranked.isEmpty) return null;
-    final key = categoryKey == 'Classroom' ? 'Class' : categoryKey;
     UserModel? best;
     double bestVal = -1;
     for (final u in ranked) {
-      final v = (u.currentRating[key] ?? 0) as num;
+      final v = _categoryValue(u, categoryKey);
       if (v > bestVal) {
-        bestVal = v.toDouble();
+        bestVal = v;
         best = u;
       }
     }
@@ -54,8 +69,7 @@ class LeaderboardController extends GetxController {
   double categoryLeaderPoints(String categoryKey) {
     final u = categoryLeader(categoryKey);
     if (u == null) return 0;
-    final key = categoryKey == 'Classroom' ? 'Class' : categoryKey;
-    return ((u.currentRating[key] ?? 0) as num).toDouble();
+    return _categoryValue(u, categoryKey);
   }
 
   void setTimeframe(int index) => selectedTimeframe.value = index;
@@ -125,11 +139,10 @@ class LeaderboardController extends GetxController {
   }
 
   bool _hasAnyPoints(UserModel u) {
-    // currentRating is `{}` immediately after season reset.
+    if (u.automatedOvr != null && u.automatedOvr! > 0) return true;
     if (u.currentRating.isEmpty) return false;
     for (final v in u.currentRating.values) {
       if (v is num) {
-        // Any non-zero means this athlete actually has points.
         if (v != 0) return true;
       } else {
         final parsed = num.tryParse(v.toString());
@@ -180,36 +193,36 @@ class _MockLeaderboardData {
       );
 
   static const List<_MockLeaderboardData> athletes = [
-    _MockLeaderboardData(uid: '1', name: 'Marcus Johnson', ovr: 92, previousRank: 2, positionGroup: 'QB', currentRating: {'Performance': 38.0, 'Class': 17.0, 'Program': 14.0, 'Standard': 15.0}),
-    _MockLeaderboardData(uid: '2', name: 'E. Smith', ovr: 88, previousRank: 1, positionGroup: 'WR', currentRating: {'Performance': 32.0, 'Class': 18.0, 'Program': 12.0, 'Standard': 14.0}),
-    _MockLeaderboardData(uid: '3', name: 'K. Brown', ovr: 84, previousRank: 3, positionGroup: 'RB', currentRating: {'Performance': 30.0, 'Class': 16.0, 'Program': 14.0, 'Standard': 13.0}),
-    _MockLeaderboardData(uid: '4', name: 'T. Rogers', ovr: 82, previousRank: 5, positionGroup: 'WR', currentRating: {'Performance': 28.0, 'Class': 22.0, 'Program': 12.0, 'Standard': 12.0}),
-    _MockLeaderboardData(uid: '5', name: 'J. Williams', ovr: 79, previousRank: 4, positionGroup: 'OL', currentRating: {'Performance': 26.0, 'Class': 15.0, 'Program': 16.0, 'Standard': 11.0}),
-    _MockLeaderboardData(uid: '6', name: 'D. Davis', ovr: 78, previousRank: 6, positionGroup: 'LB', currentRating: {'Performance': 29.0, 'Class': 14.0, 'Program': 13.0, 'Standard': 10.0}),
-    _MockLeaderboardData(uid: '7', name: 'M. Wilson', ovr: 76, previousRank: 7, positionGroup: 'DB', currentRating: {'Performance': 25.0, 'Class': 16.0, 'Program': 12.0, 'Standard': 11.0}),
-    _MockLeaderboardData(uid: '8', name: 'A. Martinez', ovr: 75, previousRank: 9, positionGroup: 'TE', currentRating: {'Performance': 24.0, 'Class': 15.0, 'Program': 14.0, 'Standard': 10.0}),
-    _MockLeaderboardData(uid: '9', name: 'C. Lee', ovr: 74, previousRank: 8, positionGroup: 'DL', currentRating: {'Performance': 23.0, 'Class': 16.0, 'Program': 13.0, 'Standard': 10.0}),
-    _MockLeaderboardData(uid: '10', name: 'R. Taylor', ovr: 73, previousRank: 10, positionGroup: 'WR', currentRating: {'Performance': 22.0, 'Class': 17.0, 'Program': 12.0, 'Standard': 10.0}),
-    _MockLeaderboardData(uid: '11', name: 'J. Harris', ovr: 72, previousRank: 11, positionGroup: 'RB', currentRating: {'Performance': 21.0, 'Class': 15.0, 'Program': 14.0, 'Standard': 10.0}),
-    _MockLeaderboardData(uid: '12', name: 'L. Clark', ovr: 71, previousRank: 12, positionGroup: 'OL', currentRating: {'Performance': 20.0, 'Class': 16.0, 'Program': 12.0, 'Standard': 11.0}),
-    _MockLeaderboardData(uid: '13', name: 'S. Lewis', ovr: 70, previousRank: 14, positionGroup: 'LB', currentRating: {'Performance': 19.0, 'Class': 15.0, 'Program': 13.0, 'Standard': 11.0}),
-    _MockLeaderboardData(uid: '14', name: 'P. Walker', ovr: 69, previousRank: 13, positionGroup: 'DB', currentRating: {'Performance': 18.0, 'Class': 16.0, 'Program': 12.0, 'Standard': 10.0}),
-    _MockLeaderboardData(uid: '15', name: 'N. Hall', ovr: 68, previousRank: 15, positionGroup: 'QB', currentRating: {'Performance': 17.0, 'Class': 15.0, 'Program': 14.0, 'Standard': 10.0}),
-    _MockLeaderboardData(uid: '16', name: 'K. Young', ovr: 67, previousRank: 16, positionGroup: 'WR', currentRating: {'Performance': 16.0, 'Class': 16.0, 'Program': 12.0, 'Standard': 11.0}),
-    _MockLeaderboardData(uid: '17', name: 'T. King', ovr: 66, previousRank: 17, positionGroup: 'RB', currentRating: {'Performance': 15.0, 'Class': 15.0, 'Program': 13.0, 'Standard': 11.0}),
-    _MockLeaderboardData(uid: '18', name: 'D. Wright', ovr: 65, previousRank: 18, positionGroup: 'OL', currentRating: {'Performance': 14.0, 'Class': 16.0, 'Program': 12.0, 'Standard': 10.0}),
-    _MockLeaderboardData(uid: '19', name: 'E. Scott', ovr: 64, previousRank: 19, positionGroup: 'LB', currentRating: {'Performance': 13.0, 'Class': 15.0, 'Program': 14.0, 'Standard': 10.0}),
-    _MockLeaderboardData(uid: '20', name: 'M. Green', ovr: 63, previousRank: 20, positionGroup: 'DL', currentRating: {'Performance': 12.0, 'Class': 16.0, 'Program': 12.0, 'Standard': 11.0}),
-    _MockLeaderboardData(uid: '21', name: 'A. Davis', ovr: 62, previousRank: 23, positionGroup: 'Forward', currentRating: {'Performance': 28.0, 'Class': 14.0, 'Program': 12.0, 'Standard': 13.0}),
-    _MockLeaderboardData(uid: '22', name: 'S. Curry', ovr: 61, previousRank: 22, positionGroup: 'Guard', currentRating: {'Performance': 26.0, 'Class': 16.0, 'Program': 12.0, 'Standard': 12.0}),
-    _MockLeaderboardData(uid: '23', name: 'K. Leonard', ovr: 60, previousRank: 21, positionGroup: 'Forward', currentRating: {'Performance': 25.0, 'Class': 15.0, 'Program': 13.0, 'Standard': 11.0}),
-    _MockLeaderboardData(uid: '24', name: 'J. Adams', ovr: 59, previousRank: 24, positionGroup: 'Guard', currentRating: {'Performance': 24.0, 'Class': 14.0, 'Program': 12.0, 'Standard': 12.0}),
-    _MockLeaderboardData(uid: '25', name: 'B. Simmons', ovr: 58, previousRank: 25, positionGroup: 'Center', currentRating: {'Performance': 23.0, 'Class': 15.0, 'Program': 11.0, 'Standard': 11.0}),
-    _MockLeaderboardData(uid: '26', name: 'R. Jackson', ovr: 57, previousRank: 26, positionGroup: 'Forward', currentRating: {'Performance': 22.0, 'Class': 14.0, 'Program': 12.0, 'Standard': 10.0}),
-    _MockLeaderboardData(uid: '27', name: 'D. Mitchell', ovr: 56, previousRank: 27, positionGroup: 'Guard', currentRating: {'Performance': 21.0, 'Class': 15.0, 'Program': 11.0, 'Standard': 10.0}),
-    _MockLeaderboardData(uid: '28', name: 'H. Barnes', ovr: 55, previousRank: 28, positionGroup: 'Forward', currentRating: {'Performance': 20.0, 'Class': 14.0, 'Program': 12.0, 'Standard': 10.0}),
-    _MockLeaderboardData(uid: '29', name: 'F. Turner', ovr: 54, previousRank: 29, positionGroup: 'Guard', currentRating: {'Performance': 19.0, 'Class': 15.0, 'Program': 11.0, 'Standard': 10.0}),
-    _MockLeaderboardData(uid: '30', name: 'G. Hill', ovr: 53, previousRank: 30, positionGroup: 'Forward', currentRating: {'Performance': 18.0, 'Class': 14.0, 'Program': 12.0, 'Standard': 10.0}),
-    _MockLeaderboardData(uid: '31', name: 'W. Cooper', ovr: 52, previousRank: 31, positionGroup: 'Center', currentRating: {'Performance': 17.0, 'Class': 14.0, 'Program': 11.0, 'Standard': 11.0}),
+    _MockLeaderboardData(uid: '1', name: 'Marcus Johnson', ovr: 92, previousRank: 2, positionGroup: 'QB', currentRating: {'Athlete': 38.0, 'Student': 17.0, 'Teammate': 14.0, 'Citizen': 15.0}),
+    _MockLeaderboardData(uid: '2', name: 'E. Smith', ovr: 88, previousRank: 1, positionGroup: 'WR', currentRating: {'Athlete': 32.0, 'Student': 18.0, 'Teammate': 12.0, 'Citizen': 14.0}),
+    _MockLeaderboardData(uid: '3', name: 'K. Brown', ovr: 84, previousRank: 3, positionGroup: 'RB', currentRating: {'Athlete': 30.0, 'Student': 16.0, 'Teammate': 14.0, 'Citizen': 13.0}),
+    _MockLeaderboardData(uid: '4', name: 'T. Rogers', ovr: 82, previousRank: 5, positionGroup: 'WR', currentRating: {'Athlete': 28.0, 'Student': 22.0, 'Teammate': 12.0, 'Citizen': 12.0}),
+    _MockLeaderboardData(uid: '5', name: 'J. Williams', ovr: 79, previousRank: 4, positionGroup: 'OL', currentRating: {'Athlete': 26.0, 'Student': 15.0, 'Teammate': 16.0, 'Citizen': 11.0}),
+    _MockLeaderboardData(uid: '6', name: 'D. Davis', ovr: 78, previousRank: 6, positionGroup: 'LB', currentRating: {'Athlete': 29.0, 'Student': 14.0, 'Teammate': 13.0, 'Citizen': 10.0}),
+    _MockLeaderboardData(uid: '7', name: 'M. Wilson', ovr: 76, previousRank: 7, positionGroup: 'DB', currentRating: {'Athlete': 25.0, 'Student': 16.0, 'Teammate': 12.0, 'Citizen': 11.0}),
+    _MockLeaderboardData(uid: '8', name: 'A. Martinez', ovr: 75, previousRank: 9, positionGroup: 'TE', currentRating: {'Athlete': 24.0, 'Student': 15.0, 'Teammate': 14.0, 'Citizen': 10.0}),
+    _MockLeaderboardData(uid: '9', name: 'C. Lee', ovr: 74, previousRank: 8, positionGroup: 'DL', currentRating: {'Athlete': 23.0, 'Student': 16.0, 'Teammate': 13.0, 'Citizen': 10.0}),
+    _MockLeaderboardData(uid: '10', name: 'R. Taylor', ovr: 73, previousRank: 10, positionGroup: 'WR', currentRating: {'Athlete': 22.0, 'Student': 17.0, 'Teammate': 12.0, 'Citizen': 10.0}),
+    _MockLeaderboardData(uid: '11', name: 'J. Harris', ovr: 72, previousRank: 11, positionGroup: 'RB', currentRating: {'Athlete': 21.0, 'Student': 15.0, 'Teammate': 14.0, 'Citizen': 10.0}),
+    _MockLeaderboardData(uid: '12', name: 'L. Clark', ovr: 71, previousRank: 12, positionGroup: 'OL', currentRating: {'Athlete': 20.0, 'Student': 16.0, 'Teammate': 12.0, 'Citizen': 11.0}),
+    _MockLeaderboardData(uid: '13', name: 'S. Lewis', ovr: 70, previousRank: 14, positionGroup: 'LB', currentRating: {'Athlete': 19.0, 'Student': 15.0, 'Teammate': 13.0, 'Citizen': 11.0}),
+    _MockLeaderboardData(uid: '14', name: 'P. Walker', ovr: 69, previousRank: 13, positionGroup: 'DB', currentRating: {'Athlete': 18.0, 'Student': 16.0, 'Teammate': 12.0, 'Citizen': 10.0}),
+    _MockLeaderboardData(uid: '15', name: 'N. Hall', ovr: 68, previousRank: 15, positionGroup: 'QB', currentRating: {'Athlete': 17.0, 'Student': 15.0, 'Teammate': 14.0, 'Citizen': 10.0}),
+    _MockLeaderboardData(uid: '16', name: 'K. Young', ovr: 67, previousRank: 16, positionGroup: 'WR', currentRating: {'Athlete': 16.0, 'Student': 16.0, 'Teammate': 12.0, 'Citizen': 11.0}),
+    _MockLeaderboardData(uid: '17', name: 'T. King', ovr: 66, previousRank: 17, positionGroup: 'RB', currentRating: {'Athlete': 15.0, 'Student': 15.0, 'Teammate': 13.0, 'Citizen': 11.0}),
+    _MockLeaderboardData(uid: '18', name: 'D. Wright', ovr: 65, previousRank: 18, positionGroup: 'OL', currentRating: {'Athlete': 14.0, 'Student': 16.0, 'Teammate': 12.0, 'Citizen': 10.0}),
+    _MockLeaderboardData(uid: '19', name: 'E. Scott', ovr: 64, previousRank: 19, positionGroup: 'LB', currentRating: {'Athlete': 13.0, 'Student': 15.0, 'Teammate': 14.0, 'Citizen': 10.0}),
+    _MockLeaderboardData(uid: '20', name: 'M. Green', ovr: 63, previousRank: 20, positionGroup: 'DL', currentRating: {'Athlete': 12.0, 'Student': 16.0, 'Teammate': 12.0, 'Citizen': 11.0}),
+    _MockLeaderboardData(uid: '21', name: 'A. Davis', ovr: 62, previousRank: 23, positionGroup: 'Forward', currentRating: {'Athlete': 28.0, 'Student': 14.0, 'Teammate': 12.0, 'Citizen': 13.0}),
+    _MockLeaderboardData(uid: '22', name: 'S. Curry', ovr: 61, previousRank: 22, positionGroup: 'Guard', currentRating: {'Athlete': 26.0, 'Student': 16.0, 'Teammate': 12.0, 'Citizen': 12.0}),
+    _MockLeaderboardData(uid: '23', name: 'K. Leonard', ovr: 60, previousRank: 21, positionGroup: 'Forward', currentRating: {'Athlete': 25.0, 'Student': 15.0, 'Teammate': 13.0, 'Citizen': 11.0}),
+    _MockLeaderboardData(uid: '24', name: 'J. Adams', ovr: 59, previousRank: 24, positionGroup: 'Guard', currentRating: {'Athlete': 24.0, 'Student': 14.0, 'Teammate': 12.0, 'Citizen': 12.0}),
+    _MockLeaderboardData(uid: '25', name: 'B. Simmons', ovr: 58, previousRank: 25, positionGroup: 'Center', currentRating: {'Athlete': 23.0, 'Student': 15.0, 'Teammate': 11.0, 'Citizen': 11.0}),
+    _MockLeaderboardData(uid: '26', name: 'R. Jackson', ovr: 57, previousRank: 26, positionGroup: 'Forward', currentRating: {'Athlete': 22.0, 'Student': 14.0, 'Teammate': 12.0, 'Citizen': 10.0}),
+    _MockLeaderboardData(uid: '27', name: 'D. Mitchell', ovr: 56, previousRank: 27, positionGroup: 'Guard', currentRating: {'Athlete': 21.0, 'Student': 15.0, 'Teammate': 11.0, 'Citizen': 10.0}),
+    _MockLeaderboardData(uid: '28', name: 'H. Barnes', ovr: 55, previousRank: 28, positionGroup: 'Forward', currentRating: {'Athlete': 20.0, 'Student': 14.0, 'Teammate': 12.0, 'Citizen': 10.0}),
+    _MockLeaderboardData(uid: '29', name: 'F. Turner', ovr: 54, previousRank: 29, positionGroup: 'Guard', currentRating: {'Athlete': 19.0, 'Student': 15.0, 'Teammate': 11.0, 'Citizen': 10.0}),
+    _MockLeaderboardData(uid: '30', name: 'G. Hill', ovr: 53, previousRank: 30, positionGroup: 'Forward', currentRating: {'Athlete': 18.0, 'Student': 14.0, 'Teammate': 12.0, 'Citizen': 10.0}),
+    _MockLeaderboardData(uid: '31', name: 'W. Cooper', ovr: 52, previousRank: 31, positionGroup: 'Center', currentRating: {'Athlete': 17.0, 'Student': 14.0, 'Teammate': 11.0, 'Citizen': 11.0}),
   ];
 }

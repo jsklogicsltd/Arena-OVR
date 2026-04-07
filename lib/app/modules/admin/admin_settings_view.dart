@@ -7,6 +7,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../core/widgets/stadium_background.dart';
 import '../../core/widgets/glass_card.dart';
+import '../../core/components/animated_glowing_border.dart';
 import 'admin_controller.dart';
 
 class AdminSettingsView extends GetView<AdminController> {
@@ -71,10 +72,14 @@ class AdminSettingsView extends GetView<AdminController> {
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: StadiumBackground(
-        child: SafeArea(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            // const FireSparksBackground(),
+            SafeArea(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
               // Top Bar
               Padding(
                 padding: const EdgeInsets.all(24.0),
@@ -131,65 +136,83 @@ class AdminSettingsView extends GetView<AdminController> {
                                     onTap: controller.updateAdminPhoto,
                                     child: Obx(() {
                                       final url = controller.adminPhotoUrl.value;
-                                      return Container(
-                                        width: 80,
-                                        height: 80,
-                                        decoration: BoxDecoration(
-                                          shape: BoxShape.circle,
-                                          border: Border.all(
-                                            color: const Color(0xFFFFB800),
-                                            width: 2,
-                                          ),
-                                          boxShadow: [
-                                            BoxShadow(
-                                              color: const Color(0xFFFFB800).withValues(alpha: 0.05),
-                                              blurRadius: 15,
-                                              spreadRadius: 0,
-                                              offset: const Offset(0, 0),
-                                            ),
-                                          ],
-                                          color: Colors.white.withValues(alpha: 0.1),
-                                          image: url.isNotEmpty
-                                              ? DecorationImage(
-                                                  image: CachedNetworkImageProvider(url),
-                                                  fit: BoxFit.cover,
-                                                )
-                                              : null,
-                                        ),
-                                        child: url.isEmpty
-                                            ? const Center(
-                                                child: Icon(
-                                                  Icons.person,
-                                                  size: 40,
-                                                  color: Colors.white70,
+                                      final uploading =
+                                          controller.isUpdatingPhoto.value;
+                                      return AnimatedGlowingBorder(
+                                        diameter: 86,
+                                        borderWidth: 3,
+                                        duration: const Duration(seconds: 4),
+                                        child: SizedBox(
+                                          width: 80,
+                                          height: 80,
+                                          child: Stack(
+                                            fit: StackFit.expand,
+                                            children: [
+                                              Container(
+                                                width: 80,
+                                                height: 80,
+                                                decoration: BoxDecoration(
+                                                  shape: BoxShape.circle,
+                                                  border: Border.all(
+                                                    color: const Color(0xFFFFB800),
+                                                    width: 2,
+                                                  ),
+                                                  boxShadow: [
+                                                    BoxShadow(
+                                                      color: const Color(
+                                                              0xFFFFB800)
+                                                          .withValues(
+                                                              alpha: 0.05),
+                                                      blurRadius: 15,
+                                                      spreadRadius: 0,
+                                                      offset: const Offset(0, 0),
+                                                    ),
+                                                  ],
+                                                  color: Colors.white
+                                                      .withValues(alpha: 0.1),
+                                                  image: url.isNotEmpty
+                                                      ? DecorationImage(
+                                                          image:
+                                                              CachedNetworkImageProvider(
+                                                                  url),
+                                                          fit: BoxFit.cover,
+                                                        )
+                                                      : null,
                                                 ),
-                                              )
-                                            : null,
+                                                child: url.isEmpty
+                                                    ? const Center(
+                                                        child: Icon(
+                                                          Icons.person,
+                                                          size: 40,
+                                                          color: Colors.white70,
+                                                        ),
+                                                      )
+                                                    : null,
+                                              ),
+                                              if (uploading)
+                                                Container(
+                                                  decoration: const BoxDecoration(
+                                                    shape: BoxShape.circle,
+                                                    color: Colors.black54,
+                                                  ),
+                                                  child: const Center(
+                                                    child: SizedBox(
+                                                      width: 28,
+                                                      height: 28,
+                                                      child:
+                                                          CircularProgressIndicator(
+                                                        strokeWidth: 2,
+                                                        color: Colors.white,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ),
+                                            ],
+                                          ),
+                                        ),
                                       );
                                     }),
                                   ),
-                                  Obx(() => controller.isUpdatingPhoto.value
-                                      ? Positioned.fill(
-                                          child: Container(
-                                            width: 80,
-                                            height: 80,
-                                            decoration: const BoxDecoration(
-                                              shape: BoxShape.circle,
-                                              color: Colors.black54,
-                                            ),
-                                            child: const Center(
-                                              child: SizedBox(
-                                                width: 28,
-                                                height: 28,
-                                                child: CircularProgressIndicator(
-                                                  strokeWidth: 2,
-                                                  color: Colors.white,
-                                                ),
-                                              ),
-                                            ),
-                                          ),
-                                        )
-                                      : const SizedBox.shrink()),
                                   Stack(
                                     alignment: Alignment.center,
                                     children: [
@@ -336,15 +359,16 @@ class AdminSettingsView extends GetView<AdminController> {
                               'Push Notifications',
                               true,
                             ),
-                            Divider(
-                              color: Colors.white.withValues(alpha: 0.1),
-                              height: 1,
-                            ),
-                            _buildSwitchTile(
-                              Icons.person_add_outlined,
-                              'New Coach Alerts',
-                              true,
-                            ),
+                            // NOTE: Other notification preferences are hidden for now.
+                            // Divider(
+                            //   color: Colors.white.withValues(alpha: 0.1),
+                            //   height: 1,
+                            // ),
+                            // _buildSwitchTile(
+                            //   Icons.person_add_outlined,
+                            //   'New Coach Alerts',
+                            //   true,
+                            // ),
                           ],
                         ),
                       ).animate(delay: 500.ms).fade().slideY(begin: 0.2),
@@ -377,6 +401,44 @@ class AdminSettingsView extends GetView<AdminController> {
                           ],
                         ),
                       ).animate(delay: 700.ms).fade().slideY(begin: 0.2),
+                      const SizedBox(height: 24),
+
+                      _buildSectionHeader(
+                        'DANGER ZONE',
+                      ).animate(delay: 750.ms).fade(),
+                      const SizedBox(height: 8),
+                      GlassCard(
+                        backgroundColor: Colors.white.withValues(alpha: 0.05),
+                        padding: EdgeInsets.zero,
+                        child: ListTile(
+                          leading: const Icon(
+                            Icons.delete_forever_outlined,
+                            color: Color(0xFFEF4444),
+                            size: 24,
+                          ),
+                          title: Text(
+                            'Delete My Account',
+                            style: GoogleFonts.spaceGrotesk(
+                              color: const Color(0xFFEF4444),
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          subtitle: Text(
+                            'Permanent — removes your login and profile data.',
+                            style: GoogleFonts.inter(
+                              color: Colors.white38,
+                              fontSize: 12,
+                            ),
+                          ),
+                          trailing: const Icon(
+                            Icons.chevron_right,
+                            color: Colors.white24,
+                            size: 20,
+                          ),
+                          onTap: () => controller.deleteAccount(),
+                        ),
+                      ).animate(delay: 800.ms).fade().slideY(begin: 0.2),
                       const SizedBox(height: 48),
 
                       Center(
@@ -397,7 +459,9 @@ class AdminSettingsView extends GetView<AdminController> {
             ],
           ),
         ),
+      ],
       ),
+    ),
     );
   }
 

@@ -40,7 +40,8 @@ class BadgeRepository {
         ? Map<String, dynamic>.from(data['currentRating'])
         : {};
 
-    final double std = _getRatingValue(currentRating, 'Standard');
+    final double cit = _getRatingValue(currentRating, 'Citizen')
+        + _getRatingValue(currentRating, 'Standard');
 
     // Transaction count for First Step (first rating ever for this athlete in this team/season)
     final txSnap = await _provider.firestore
@@ -58,7 +59,7 @@ class BadgeRepository {
     if (!currentBadges.contains(BadgeIds.risingStar) && ovr >= 25) {
       toAward.add(BadgeIds.risingStar);
     }
-    if (!currentBadges.contains(BadgeIds.ironWill) && std >= 20) {
+    if (!currentBadges.contains(BadgeIds.ironWill) && cit >= 20) {
       toAward.add(BadgeIds.ironWill);
     }
     if (!currentBadges.contains(BadgeIds.mvpContender) && ovr >= 75) {

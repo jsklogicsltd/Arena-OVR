@@ -4,17 +4,15 @@ import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:shimmer/shimmer.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import '../../core/constants/app_assets.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/widgets/stadium_background.dart';
 import '../../core/widgets/glass_card.dart';
 import '../../core/widgets/arena_button.dart';
+import '../../core/widgets/fire_sparks_background.dart';
 import '../../routes/app_routes.dart';
 import 'admin_controller.dart';
 import '../../data/models/school_model.dart';
-import '../../data/models/user_model.dart';
-import 'package:intl/intl.dart';
 
 class AdminDashboardView extends GetView<AdminController> {
   const AdminDashboardView({super.key});
@@ -24,10 +22,15 @@ class AdminDashboardView extends GetView<AdminController> {
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: StadiumBackground(
-        child: SafeArea(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            // // Premium subtle background layer (non-interactive).
+            // const FireSparksBackground(),
+            SafeArea(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
               // Top Bar
               Padding(
                 padding: const EdgeInsets.symmetric(
@@ -199,8 +202,10 @@ class AdminDashboardView extends GetView<AdminController> {
                   ),
                 ),
               ),
-            ],
-          ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -366,6 +371,29 @@ class AdminDashboardView extends GetView<AdminController> {
     );
   }
 
+  void _confirmDeleteSchool(SchoolModel school) {
+    Get.defaultDialog(
+      title: 'Delete School?',
+      titleStyle: GoogleFonts.spaceGrotesk(
+        color: Colors.white,
+        fontWeight: FontWeight.bold,
+      ),
+      middleText:
+          'Are you sure? This will permanently delete "${school.name}" and all teams, coaches, and athletes associated with this school.',
+      middleTextStyle: GoogleFonts.inter(color: Colors.white70, fontSize: 14),
+      backgroundColor: const Color(0xFF0F172A),
+      buttonColor: Colors.red,
+      cancelTextColor: Colors.white,
+      confirmTextColor: Colors.white,
+      textConfirm: 'Delete',
+      textCancel: 'Cancel',
+      onConfirm: () {
+        Get.back();
+        controller.deleteSchool(school);
+      },
+    );
+  }
+
   Widget _buildSchoolCard(SchoolModel school, int index) {
     final bool isExpiring =
         school.expiryDate != null &&
@@ -507,7 +535,25 @@ class AdminDashboardView extends GetView<AdminController> {
                   ],
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 4),
+              GestureDetector(
+                onTap: () => _confirmDeleteSchool(school),
+                child: Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: Colors.red.withValues(alpha: 0.12),
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: Colors.red.withValues(alpha: 0.35),
+                      width: 1,
+                    ),
+                  ),
+                  child: const Icon(Icons.delete_outline,
+                      color: Colors.redAccent, size: 18),
+                ),
+              ),
+              const SizedBox(width: 4),
               const Icon(Icons.chevron_right, color: Colors.white54),
             ],
           ),

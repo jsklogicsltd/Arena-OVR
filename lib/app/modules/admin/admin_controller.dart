@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -12,6 +11,7 @@ import '../../data/models/user_model.dart';
 import '../../data/repositories/school_repository.dart';
 import '../../core/utils/code_generator.dart';
 import '../../routes/app_routes.dart';
+import '../../core/services/account_deletion_service.dart';
 
 class AdminController extends GetxController {
   final SchoolRepository _schoolRepo = SchoolRepository();
@@ -208,7 +208,7 @@ class AdminController extends GetxController {
 
       final coachSub = _firestore
           .collection('users')
-          .where('role', isEqualTo: 'coach')
+          .where('role', whereIn: const ['coach', 'Head Coach', 'Assistant Coach'])
           .where('schoolId', whereIn: chunkIds)
           .snapshots()
           .listen((snap) {
@@ -347,6 +347,83 @@ class AdminController extends GetxController {
     }
   }
 
+  /// Resets Create School screen state so it can be used repeatedly.
+  /// This controller is long-lived, so view state must be cleared manually.
+  void resetCreateSchoolFlow() {
+    isCreating.value = false;
+    generatedSchoolCode.value = '';
+    nameController.clear();
+    emailController.clear();
+    selectedSchoolLogo.value = null;
+    expiryDate.value = DateTime.now().add(const Duration(days: 365));
+  }
+
+  Future<void> deleteSchool(SchoolModel school) async {
+    try {
+      final batch = _firestore.batch();
+
+      final teamsSnap = await _firestore
+          .collection('teams')
+          .where('schoolId', isEqualTo: school.id)
+          .get();
+      for (final teamDoc in teamsSnap.docs) {
+        batch.delete(teamDoc.reference);
+      }
+
+      final usersSnap = await _firestore
+          .collection('users')
+          .where('schoolId', isEqualTo: school.id)
+          .get();
+      for (final userDoc in usersSnap.docs) {
+        batch.delete(userDoc.reference);
+      }
+
+      final seasonsSnap = await _firestore
+          .collection('seasons')
+          .where('schoolId', isEqualTo: school.id)
+          .get();
+      for (final doc in seasonsSnap.docs) {
+        batch.delete(doc.reference);
+      }
+
+      final txSnap = await _firestore
+          .collection('transactions')
+          .where('schoolId', isEqualTo: school.id)
+          .get();
+      for (final doc in txSnap.docs) {
+        batch.delete(doc.reference);
+      }
+
+      final feedSnap = await _firestore
+          .collection('feeds')
+          .where('schoolId', isEqualTo: school.id)
+          .get();
+      for (final doc in feedSnap.docs) {
+        batch.delete(doc.reference);
+      }
+
+      batch.delete(_firestore.collection('schools').doc(school.id));
+
+      await batch.commit();
+
+      Get.snackbar(
+        'Deleted',
+        '${school.name} and all associated data removed.',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.green.withValues(alpha: 0.8),
+        colorText: Colors.white,
+      );
+    } catch (e) {
+      Get.snackbar(
+        'Error',
+        'Failed to delete school: $e',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.red.withValues(alpha: 0.8),
+        colorText: Colors.white,
+      );
+    }
+  }
+
   Future<void> toggleSchool(SchoolModel school) async {
     try {
       await _schoolRepo.updateSchoolStatus(school.id, !school.isActive);
@@ -361,114 +438,19 @@ class AdminController extends GetxController {
     }
   }
 
-  void _showSuccessDialog(String code) {
-    Get.dialog(
-      Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        backgroundColor: const Color(0xFF1E2631),
-        child: Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(
-                Icons.check_circle_outline,
-                color: Color(0xFF00A1FF),
-                size: 64,
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                'School Created Successfully',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'Share this access code with the coach:',
-                style: TextStyle(color: Colors.white70, fontSize: 14),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 24),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 24,
-                  vertical: 16,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: const Color(0xFF00A1FF).withValues(alpha: 0.5),
-                  ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      code,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 28,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 4,
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    IconButton(
-                      icon: const Icon(Icons.copy, color: Color(0xFF00A1FF)),
-                      onPressed: () {
-                        Clipboard.setData(ClipboardData(text: code));
-                        Get.snackbar(
-                          'Copied',
-                          'Code copied to clipboard',
-                          snackPosition: SnackPosition.BOTTOM,
-                          backgroundColor: Colors.green.withValues(alpha: 0.8),
-                          colorText: Colors.white,
-                        );
-                      },
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF00A1FF),
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(30),
-                    ),
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                  ),
-                  onPressed: () {
-                    Get.back(); // close dialog
-                    Get.back(); // go back to dashboard
-                  },
-                  child: const Text(
-                    'DONE',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 1.5,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-      barrierDismissible: false,
-    );
-  }
-
   void logout() async {
     await FirebaseAuth.instance.signOut();
     Get.offAllNamed(Routes.AUTH);
+  }
+
+  Future<void> deleteAccount() async {
+    await AccountDeletionService.confirmAndDeleteAccount(
+      onSuccessCleanup: () async {},
+      afterNavigation: () {
+        if (Get.isRegistered<AdminController>()) {
+          Get.delete<AdminController>(force: true);
+        }
+      },
+    );
   }
 }

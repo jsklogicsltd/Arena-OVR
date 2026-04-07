@@ -9,8 +9,9 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../coach_controller.dart';
 import '../../../data/models/user_model.dart';
 import '../../../core/constants/app_colors.dart';
-import '../../../core/widgets/stadium_background.dart';
 import '../../../core/widgets/glass_card.dart';
+import '../../../core/widgets/periodic_shimmer_bar.dart';
+import '../../../core/components/animated_glowing_border.dart';
 import '../../../routes/app_routes.dart';
 import 'announcement_view.dart';
 
@@ -24,6 +25,10 @@ class CoachDashboardView extends GetView<CoachController> {
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (context) {
         return Obx(() {
+          // Only show active teams. Deactivated teams are considered deleted in UX.
+          final activeTeams =
+              controller.coachTeams.where((t) => t.isActive).toList();
+          final currentId = controller.currentTeam.value?.id;
           return Container(
             padding: const EdgeInsets.all(24),
             child: Column(
@@ -32,8 +37,17 @@ class CoachDashboardView extends GetView<CoachController> {
               children: [
                 Text('Switch Team', style: GoogleFonts.spaceGrotesk(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 16),
-                ...controller.coachTeams.map((team) {
-                  final isActive = controller.currentTeam.value?.id == team.id;
+                if (activeTeams.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: Text(
+                      'No active teams found.',
+                      style:
+                          GoogleFonts.inter(color: Colors.white54, fontSize: 13),
+                    ),
+                  ),
+                ...activeTeams.map((team) {
+                  final isSelected = currentId == team.id;
                   return ListTile(
                     contentPadding: EdgeInsets.zero,
                     onTap: () {
@@ -45,8 +59,17 @@ class CoachDashboardView extends GetView<CoachController> {
                       backgroundImage: team.logoUrl != null ? CachedNetworkImageProvider(team.logoUrl!) : null,
                       child: team.logoUrl == null ? const Icon(Icons.shield, color: Colors.white54, size: 20) : null,
                     ),
-                    title: Text(team.name, style: GoogleFonts.spaceGrotesk(color: isActive ? AppColors.tierGold : Colors.white, fontWeight: isActive ? FontWeight.bold : FontWeight.normal)),
-                    trailing: isActive ? const Icon(Icons.check_circle, color: AppColors.tierGold) : null,
+                    title: Text(
+                      team.name,
+                      style: GoogleFonts.spaceGrotesk(
+                        color: isSelected ? AppColors.tierGold : Colors.white,
+                        fontWeight:
+                            isSelected ? FontWeight.bold : FontWeight.normal,
+                      ),
+                    ),
+                    trailing: isSelected
+                        ? const Icon(Icons.check_circle, color: AppColors.tierGold)
+                        : null,
                   );
                 }),
                 const SizedBox(height: 16),
@@ -76,19 +99,26 @@ class CoachDashboardView extends GetView<CoachController> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.transparent,
-      body: StadiumBackground(
-        child: SafeArea(
-          child: Obx(() {
-            final team = controller.currentTeam.value;
-            if (team == null) return const Center(child: CircularProgressIndicator(color: AppColors.tierGold));
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          // const FireSparksBackground(),
+          SafeArea(
+            child: Obx(() {
+              final team = controller.currentTeam.value;
+              if (team == null) {
+                return const Center(
+                    child: CircularProgressIndicator(color: AppColors.tierGold));
+              }
 
-            return _DashboardBody(
-              controller: controller,
-              team: team,
-              onShowTeamSwitcher: () => _showTeamSwitcher(context),
-            );
-          }),
-        ),
+              return _DashboardBody(
+                controller: controller,
+                team: team,
+                onShowTeamSwitcher: () => _showTeamSwitcher(context),
+              );
+            }),
+          ),
+        ],
       ),
     );
   }
@@ -176,23 +206,6 @@ class _DashboardBodyState extends State<_DashboardBody> with TickerProviderState
     return sum / roster.length;
   }
 
-  static bool _hasAnyPoints(UserModel u) {
-    if (u.currentRating.isEmpty) return false;
-    for (final v in u.currentRating.values) {
-      if (v is num) {
-        if (v != 0) return true;
-      } else {
-        final parsed = num.tryParse(v.toString());
-        if (parsed != null && parsed != 0) return true;
-      }
-    }
-    return false;
-  }
-
-  static List<UserModel> _rosterWithPoints(List<UserModel> roster) {
-    return roster.where(_hasAnyPoints).toList();
-  }
-
   void _refresh() {
     final rosterAll = c.roster;
     // For coach dashboard we want TEAM metrics to always reflect the full roster,
@@ -207,10 +220,10 @@ class _DashboardBodyState extends State<_DashboardBody> with TickerProviderState
     final double stdVal;
     if (isReal) {
       ovrVal = roster.map((a) => a.coachVisibleOvr).reduce((a, b) => a + b) / roster.length;
-      perVal = _avgCategoryPoints(roster, 'Performance');
-      classVal = _avgCategoryPoints(roster, 'Class', 'Classroom');
-      progVal = _avgCategoryPoints(roster, 'Program');
-      stdVal = _avgCategoryPoints(roster, 'Standard');
+      perVal = _avgCategoryPoints(roster, 'Athlete', 'Performance');
+      classVal = _avgCategoryPoints(roster, 'Student', 'Class');
+      progVal = _avgCategoryPoints(roster, 'Teammate', 'Program');
+      stdVal = _avgCategoryPoints(roster, 'Citizen', 'Standard');
     } else {
       // When season just reset and nobody has points yet, keep values at 0
       // instead of using potentially-stale stored team averages.
@@ -273,13 +286,17 @@ class _DashboardBodyState extends State<_DashboardBody> with TickerProviderState
             ],
           ),
           const SizedBox(height: 6),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(4),
-            child: LinearProgressIndicator(
-              value: pct,
-              backgroundColor: Colors.white.withOpacity(0.08),
-              valueColor: AlwaysStoppedAnimation<Color>(color),
-              minHeight: 5,
+          PeriodicShimmerBar(
+            baseColor: color,
+            shimmerFraction: pct,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: LinearProgressIndicator(
+                value: pct,
+                backgroundColor: Colors.white.withOpacity(0.08),
+                valueColor: AlwaysStoppedAnimation<Color>(color),
+                minHeight: 5,
+              ),
             ),
           ),
         ],
@@ -309,29 +326,20 @@ class _DashboardBodyState extends State<_DashboardBody> with TickerProviderState
                                   // Coach profile photo (real-time reactive)
                                   Obx(() {
                                     final url = c.coachPhotoUrl.value;
-                                    return Container(
-                                      width: 48,
-                                      height: 48,
-                                      decoration: BoxDecoration(
-                                        shape: BoxShape.circle,
-                                        gradient: const LinearGradient(
-                                          colors: [AppColors.primary, AppColors.tierGold],
-                                          begin: Alignment.bottomLeft,
-                                          end: Alignment.topRight,
-                                        ),
-                                      ),
-                                      child: Padding(
-                                        padding: const EdgeInsets.all(2.0),
-                                        child: CircleAvatar(
-                                          radius: 20,
-                                          backgroundColor: const Color(0xFF1E293B),
-                                          backgroundImage: url.isNotEmpty
-                                              ? CachedNetworkImageProvider(url)
-                                              : null,
-                                          child: url.isEmpty
-                                              ? const Icon(Icons.person, color: Colors.white54, size: 22)
-                                              : null,
-                                        ),
+                                    return AnimatedGlowingBorder(
+                                      diameter: 48,
+                                      borderWidth: 2,
+                                      duration: const Duration(seconds: 4),
+                                      child: CircleAvatar(
+                                        radius: 22,
+                                        backgroundColor: const Color(0xFF1E293B),
+                                        backgroundImage: url.isNotEmpty
+                                            ? CachedNetworkImageProvider(url)
+                                            : null,
+                                        child: url.isEmpty
+                                            ? const Icon(Icons.person,
+                                                color: Colors.white54, size: 22)
+                                            : null,
                                       ),
                                     );
                                   }),
@@ -514,46 +522,35 @@ class _DashboardBodyState extends State<_DashboardBody> with TickerProviderState
                               child: Stack(
                                 clipBehavior: Clip.none,
                                 children: [
-                                  Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
+                                  Padding(
+                                    // Leave breathing room so the TEAM badge doesn't collide with the logo.
+                                    padding: const EdgeInsets.only(top: 10),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
                                       Row(
                                         crossAxisAlignment: CrossAxisAlignment.center,
                                         children: [
-                                          Container(
-                                            width: 100,
-                                            height: 100,
-                                            padding: const EdgeInsets.all(4),
-                                            decoration: BoxDecoration(
-                                              borderRadius: BorderRadius.circular(24),
-                                              gradient: LinearGradient(
-                                                begin: Alignment.topLeft,
-                                                end: Alignment.bottomRight,
-                                                colors: [
-                                                  AppColors.seasonGold,
-                                                  AppColors.seasonGold.withOpacity(0.2),
-                                                  AppColors.seasonGold.withOpacity(0.5),
-                                                  AppColors.seasonGold.withOpacity(0.5),
-                                                ],
-                                                stops: const [0.0, 0.2, 0.5, 1.0],
-                                              ),
-                                            ),
-                                            child: ClipRRect(
-                                              borderRadius: BorderRadius.circular(20),
-                                              child: Container(
-                                                decoration: BoxDecoration(
-                                                  image: logoUrl != null && logoUrl.isNotEmpty
-                                                      ? DecorationImage(
-                                                          image: CachedNetworkImageProvider(logoUrl),
-                                                          fit: BoxFit.cover,
-                                                        )
-                                                      : null,
-                                                  color: const Color(0xFF0F1923),
-                                                ),
-                                                child: logoUrl == null || logoUrl.isEmpty
-                                                    ? const Icon(Icons.sports_football, color: Colors.white54, size: 40)
-                                                    : null,
-                                              ),
+                                          AnimatedGlowingBorder(
+                                            // Border width acts as the padding gap between image and glow.
+                                            diameter: 108,
+                                            borderWidth: 4,
+                                            duration: const Duration(seconds: 5),
+                                            child: SizedBox(
+                                              width: 100,
+                                              height: 100,
+                                              child: (logoUrl != null && logoUrl.isNotEmpty)
+                                                  ? Image(
+                                                      image: CachedNetworkImageProvider(logoUrl),
+                                                      fit: BoxFit.cover,
+                                                    )
+                                                  : const Center(
+                                                      child: Icon(
+                                                        Icons.sports_football,
+                                                        color: Colors.white54,
+                                                        size: 40,
+                                                      ),
+                                                    ),
                                             ),
                                           ),
                                           const SizedBox(width: 20),
@@ -622,21 +619,22 @@ class _DashboardBodyState extends State<_DashboardBody> with TickerProviderState
                                       Row(
                                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                         children: [
-                                          _buildStatBar('PER', _perAnim.value, AppColors.primary, 100),
+                                          _buildStatBar('ATH', _perAnim.value, AppColors.primary, 100),
                                           const SizedBox(width: 12),
-                                          _buildStatBar('CLA', _tmAnim.value, AppColors.positive, 100),
+                                          _buildStatBar('STU', _tmAnim.value, AppColors.positive, 100),
                                           const SizedBox(width: 12),
-                                          _buildStatBar('PRO', _impAnim.value, AppColors.seasonGold, 100),
+                                          _buildStatBar('TM', _impAnim.value, AppColors.seasonGold, 100),
                                           const SizedBox(width: 12),
-                                          _buildStatBar('STD', _stdAnim.value, Colors.grey, 100),
+                                          _buildStatBar('CIT', _stdAnim.value, Colors.grey, 100),
                                         ],
                                       ),
-                                    ],
+                                      ],
+                                    ),
                                   ),
                                   Positioned(
                                     // Move badge away from avatar/image so it sits below it.
-                                    top: -15,
-                                    left: 0,
+                                    top: -14,
+                                    left: -14,
                                     child: Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
                                       decoration: BoxDecoration(
@@ -939,7 +937,7 @@ class _DashboardBodyState extends State<_DashboardBody> with TickerProviderState
     return [
       _MockActivity(
         type: 'PERFORMANCE',
-        title: 'You awarded Sarah Chen +3 in Performance',
+        title: 'You awarded Sarah Chen +3 in Athlete',
         timeAgo: '2 min ago',
         actorName: 'You',
       ),
@@ -961,7 +959,7 @@ class _DashboardBodyState extends State<_DashboardBody> with TickerProviderState
             const TextSpan(text: 'You awarded '),
             TextSpan(text: 'Sarah Chen ', style: GoogleFonts.inter(fontWeight: FontWeight.w700)),
             TextSpan(text: '+3 ', style: GoogleFonts.inter(fontWeight: FontWeight.w700, color: const Color(0xFF00A1FF))),
-            const TextSpan(text: 'in Performance'),
+            const TextSpan(text: 'in Athlete'),
           ],
         ),
       );
