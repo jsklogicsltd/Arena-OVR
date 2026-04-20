@@ -4,12 +4,11 @@ import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:shimmer/shimmer.dart';
-import '../../core/constants/app_assets.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/widgets/app_logo.dart';
 import '../../core/widgets/stadium_background.dart';
 import '../../core/widgets/glass_card.dart';
 import '../../core/widgets/arena_button.dart';
-import '../../core/widgets/fire_sparks_background.dart';
 import '../../routes/app_routes.dart';
 import 'admin_controller.dart';
 import '../../data/models/school_model.dart';
@@ -42,15 +41,7 @@ class AdminDashboardView extends GetView<AdminController> {
                   children: [
                     Row(
                       children: [
-                        Image.asset(
-                          AppAssets.logo,
-                          height: 50,
-                          errorBuilder: (ctx, _, __) => const Icon(
-                            Icons.sports_football,
-                            color: Colors.blueAccent,
-                            size: 36,
-                          ),
-                        ),
+                        const AppLogo(height: 50),
                         const SizedBox(width: 8),
                         Column(
                           mainAxisSize: MainAxisSize.min,

@@ -10,6 +10,7 @@ import '../coach_controller.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/widgets/stadium_background.dart';
 import '../../../core/components/animated_glowing_border.dart';
+import '../../../core/utils/change_password_helper.dart';
 import '../../../routes/app_routes.dart';
 import 'manage_roster_screen.dart';
 
@@ -389,6 +390,13 @@ class _CoachSettingsViewState extends State<CoachSettingsView> {
 
                         const SizedBox(height: 32),
 
+                        // SUBSCRIPTION STATUS SECTION
+                        _buildSectionTitle('SUBSCRIPTION STATUS').animate(delay: 320.ms).fade(),
+                        const SizedBox(height: 12),
+                        _buildSubscriptionCard().animate(delay: 330.ms).fade().slideY(begin: 0.1),
+
+                        const SizedBox(height: 32),
+
                         // ACCOUNT SECTION
                         _buildSectionTitle('ACCOUNT').animate(delay: 350.ms).fade(),
                         const SizedBox(height: 12),
@@ -397,7 +405,7 @@ class _CoachSettingsViewState extends State<CoachSettingsView> {
                             _buildSettingsItem(
                               title: 'Change Password',
                               showArrow: true,
-                              onTap: () {},
+                              onTap: () => ChangePasswordHelper.show(context),
                             ),
                             _buildDivider(),
                             _buildSettingsItem(
@@ -551,6 +559,176 @@ class _CoachSettingsViewState extends State<CoachSettingsView> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildSubscriptionCard() {
+    return Obx(() {
+      final c = controller;
+      final loading = c.isLoadingSubStatus.value;
+      final maxTeams = c.subMaxTeams.value;
+      final maxAthletes = c.subMaxAthletes.value;
+      final curTeams = c.subCurrentTeams.value;
+      final curAthletes = c.subCurrentAthletes.value;
+
+      final teamsRatio = maxTeams > 0 ? (curTeams / maxTeams).clamp(0.0, 1.0) : 0.0;
+      final athletesRatio = maxAthletes > 0 ? (curAthletes / maxAthletes).clamp(0.0, 1.0) : 0.0;
+
+      // Warn colour when ≥ 90 % full.
+      final teamsColor = teamsRatio >= 0.9 ? const Color(0xFFEF4444) : AppColors.primary;
+      final athletesColor = athletesRatio >= 0.9 ? const Color(0xFFEF4444) : const Color(0xFF39FF14);
+
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(24),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+          child: Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.06),
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: Colors.white.withOpacity(0.1)),
+            ),
+            child: loading
+                ? const Center(
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(vertical: 20),
+                      child: SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white38,
+                        ),
+                      ),
+                    ),
+                  )
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // ── Teams bar ─────────────────────────────────────
+                      _buildUsageBar(
+                        label: 'Teams',
+                        icon: Icons.groups_outlined,
+                        current: curTeams,
+                        max: maxTeams,
+                        ratio: teamsRatio,
+                        color: teamsColor,
+                      ),
+                      const SizedBox(height: 20),
+                      // ── Athletes bar ──────────────────────────────────
+                      _buildUsageBar(
+                        label: 'Total Athletes',
+                        icon: Icons.directions_run_rounded,
+                        current: curAthletes,
+                        max: maxAthletes,
+                        ratio: athletesRatio,
+                        color: athletesColor,
+                      ),
+                      const SizedBox(height: 20),
+                      // ── Guidance note ─────────────────────────────────
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Icon(
+                            Icons.info_outline_rounded,
+                            color: Colors.white38,
+                            size: 14,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'To increase your limits, please contact your school administrator or Randy Jackson.',
+                              style: GoogleFonts.inter(
+                                color: Colors.white38,
+                                fontSize: 11,
+                                height: 1.5,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+          ),
+        ),
+      );
+    });
+  }
+
+  Widget _buildUsageBar({
+    required String label,
+    required IconData icon,
+    required int current,
+    required int max,
+    required double ratio,
+    required Color color,
+  }) {
+    final pct = (ratio * 100).round();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Label row
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
+              children: [
+                Icon(icon, color: color, size: 15),
+                const SizedBox(width: 6),
+                Text(
+                  label,
+                  style: GoogleFonts.spaceGrotesk(
+                    color: Colors.white,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+            Row(
+              children: [
+                Text(
+                  '$current / $max',
+                  style: GoogleFonts.spaceGrotesk(
+                    color: color,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: color.withOpacity(0.14),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    '$pct%',
+                    style: GoogleFonts.spaceGrotesk(
+                      color: color,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        // Track
+        ClipRRect(
+          borderRadius: BorderRadius.circular(99),
+          child: LinearProgressIndicator(
+            value: ratio,
+            minHeight: 7,
+            backgroundColor: Colors.white.withOpacity(0.08),
+            valueColor: AlwaysStoppedAnimation<Color>(color),
+          ),
+        ),
+      ],
     );
   }
 

@@ -24,7 +24,27 @@ enum SpeedProfile { standard, heavy }
 /// 73" to 74"    |  Under 155    |  155 – 219     |  220+
 /// 75"+          |  Under 169    |  169 – 239     |  240+
 /// ```
-PowerProfile assignPowerProfile(int heightInches, int weightLbs) {
+///
+/// Updated for Grade 7–8 athletes: the sports scientist provided grade-specific
+/// bodyweight cutoffs (CDC + BFS scaled). For grade 9+ we retain the original
+/// BFS height-based cutoffs.
+PowerProfile assignPowerProfile(
+  int heightInches,
+  int weightLbs, {
+  int? grade,
+}) {
+  // Grade-specific bodyweight cutoffs for younger athletes.
+  if (grade == 7) {
+    if (weightLbs > 125) return PowerProfile.heavy;
+    if (weightLbs >= 85) return PowerProfile.medium;
+    return PowerProfile.light;
+  }
+  if (grade == 8) {
+    if (weightLbs > 140) return PowerProfile.heavy;
+    if (weightLbs >= 95) return PowerProfile.medium;
+    return PowerProfile.light;
+  }
+
   int heavyThreshold;
   int mediumThreshold;
 
@@ -58,7 +78,20 @@ PowerProfile assignPowerProfile(int heightInches, int weightLbs) {
 /// 73" to 74"    |  Under 219     |  219+
 /// 75"+          |  Under 240     |  240+
 /// ```
-SpeedProfile assignSpeedProfile(int heightInches, int weightLbs) {
+///
+/// Updated for Grade 7–8 athletes: grade-specific bodyweight cutoffs.
+SpeedProfile assignSpeedProfile(
+  int heightInches,
+  int weightLbs, {
+  int? grade,
+}) {
+  if (grade == 7) {
+    return weightLbs >= 125 ? SpeedProfile.heavy : SpeedProfile.standard;
+  }
+  if (grade == 8) {
+    return weightLbs >= 140 ? SpeedProfile.heavy : SpeedProfile.standard;
+  }
+
   int heavyThreshold;
 
   if (heightInches < 69) {

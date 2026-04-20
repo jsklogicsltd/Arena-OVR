@@ -5,11 +5,12 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../../core/constants/app_assets.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/widgets/app_logo.dart';
 import '../../core/widgets/stadium_background.dart';
 import '../../core/widgets/glass_card.dart';
 import '../../core/widgets/glass_text_field.dart';
 import '../../core/widgets/arena_button.dart';
-import '../../core/widgets/fire_sparks_background.dart';
+// import '../../core/widgets/fire_sparks_background.dart';
 import '../../core/components/animated_glowing_border.dart';
 import 'signup_controller.dart';
 
@@ -186,6 +187,10 @@ class SignupView extends GetView<SignupController> {
                       controller: controller.nameController,
                       hintText: 'Full Name',
                       prefixIcon: Icons.person_outline,
+                      keyboardType: TextInputType.name,
+                      textInputAction: TextInputAction.next,
+                      textCapitalization: TextCapitalization.words,
+                      autofillHints: const [AutofillHints.name],
                     )
                     .animate(delay: 400.ms)
                     .fade(duration: 400.ms)
@@ -198,6 +203,9 @@ class SignupView extends GetView<SignupController> {
                       controller: controller.emailController,
                       hintText: 'Email Address',
                       prefixIcon: Icons.email_outlined,
+                      keyboardType: TextInputType.emailAddress,
+                      textInputAction: TextInputAction.next,
+                      autofillHints: const [AutofillHints.email],
                     )
                     .animate(delay: 460.ms)
                     .fade(duration: 400.ms)
@@ -212,6 +220,11 @@ class SignupView extends GetView<SignupController> {
                       hintText: 'Password',
                       prefixIcon: Icons.lock_outline,
                       isPassword: true,
+                      keyboardType: TextInputType.visiblePassword,
+                      textInputAction: TextInputAction.next,
+                      autofillHints: const [AutofillHints.newPassword],
+                      enableSuggestions: false,
+                      autocorrect: false,
                     )
                     .animate(delay: 520.ms)
                     .fade(duration: 400.ms)
@@ -226,6 +239,11 @@ class SignupView extends GetView<SignupController> {
                       hintText: 'Confirm Password',
                       prefixIcon: Icons.lock_outline,
                       isPassword: true,
+                      keyboardType: TextInputType.visiblePassword,
+                      textInputAction: TextInputAction.done,
+                      autofillHints: const [AutofillHints.newPassword],
+                      enableSuggestions: false,
+                      autocorrect: false,
                     )
                     .animate(delay: 580.ms)
                     .fade(duration: 400.ms)
@@ -376,15 +394,7 @@ class SignupView extends GetView<SignupController> {
     return Column(
       children: [
         // Logo with blur-clear + elastic scale + gold shimmer sweep
-        Image.asset(
-          AppAssets.logo,
-          width: 115,
-          errorBuilder: (_, __, ___) => const Icon(
-            Icons.sports_football,
-            color: AppColors.tierGold,
-            size: 72,
-          ),
-        )
+        const AppLogo(width: 115)
         .animate()
         .blur(begin: const Offset(16, 16), end: Offset.zero, duration: 600.ms, curve: Curves.easeOut)
         .fade(duration: 350.ms, curve: Curves.easeIn)

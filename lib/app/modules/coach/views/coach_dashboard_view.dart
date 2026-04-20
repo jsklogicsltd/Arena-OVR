@@ -196,7 +196,9 @@ class _DashboardBodyState extends State<_DashboardBody> with TickerProviderState
     double sum = 0;
     for (final a in roster) {
       final m = a.currentRating;
-      final raw = m[key] ?? (altKey != null ? m[altKey] : null);
+      final raw = m[key] ??
+          (key == 'Athlete' ? m['Competitor'] : null) ??
+          (altKey != null ? m[altKey] : null);
       if (raw is num) {
         sum += raw.toDouble();
       } else if (raw != null) {
@@ -383,7 +385,8 @@ class _DashboardBodyState extends State<_DashboardBody> with TickerProviderState
                         
                         // Calculate progress
                         int dayOfSeason = 1;
-                        int totalDays = 15;
+                        final teamSeasonLength = c.currentTeam.value?.seasonLengthDays ?? 15;
+                        int totalDays = teamSeasonLength;
                         int progressPercent = 0;
                         
                         if (currentSeason != null && currentSeason.startDate != null) {
@@ -391,11 +394,14 @@ class _DashboardBodyState extends State<_DashboardBody> with TickerProviderState
                           final diff = now.difference(currentSeason.startDate!).inDays;
                           dayOfSeason = diff >= 0 ? diff + 1 : 1;
                           
-                          if (currentSeason.endDate != null) {
+                          // Prefer explicit season setting first, then derived endDate.
+                          if (currentSeason.seasonLengthDays >= 7) {
+                            totalDays = currentSeason.seasonLengthDays;
+                          } else if (currentSeason.endDate != null) {
                              // Inclusive day count: end-start(14) means 15 season days.
                              totalDays = currentSeason.endDate!.difference(currentSeason.startDate!).inDays + 1;
-                             if (totalDays <= 0) totalDays = 15; // Fallback
                           }
+                          if (totalDays <= 0) totalDays = teamSeasonLength; // Fallback
                           
                           // Day 1 should start at 0%, Day N advances each completed day.
                           final denom = (totalDays - 1).clamp(1, 9999);
@@ -447,12 +453,18 @@ class _DashboardBodyState extends State<_DashboardBody> with TickerProviderState
                                       border: Border.all(color: AppColors.primary, width: 3.5),
                                     ),
                                     alignment: Alignment.center,
-                                    child: Text(
-                                      '$progressPercent%',
-                                      style: GoogleFonts.inter(
-                                        color: AppColors.primary,
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.bold,
+                                    child: FittedBox(
+                                      fit: BoxFit.scaleDown,
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(horizontal: 2),
+                                        child: Text(
+                                          '$progressPercent%',
+                                          style: GoogleFonts.inter(
+                                            color: AppColors.primary,
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
                                       ),
                                     ),
                                   ),
@@ -619,7 +631,7 @@ class _DashboardBodyState extends State<_DashboardBody> with TickerProviderState
                                       Row(
                                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                         children: [
-                                          _buildStatBar('ATH', _perAnim.value, AppColors.primary, 100),
+                                          _buildStatBar('COMP', _perAnim.value, AppColors.primary, 100),
                                           const SizedBox(width: 12),
                                           _buildStatBar('STU', _tmAnim.value, AppColors.positive, 100),
                                           const SizedBox(width: 12),
@@ -722,14 +734,14 @@ class _DashboardBodyState extends State<_DashboardBody> with TickerProviderState
                           _buildActionCard(
                             title: 'ANNOUNCE',
                             svgPath:'assets/svg/annouce.svg',
-                            color: Colors.white,
+                            color: const Color(0xFF22C55E),
                             hasBorder: false,
                             onTap: () => Get.to(() => const AnnouncementView()),
                           ).animate(delay: 500.ms).fade().scale(begin: const Offset(0.9, 0.9)),
                           _buildActionCard(
                             title: 'CREATE TEAM',
                             svgPath: 'assets/svg/createteam.svg',
-                            color: Colors.white,
+                            color: const Color(0xFFA855F7),
                             hasBorder: false,
                             onTap: () => Get.toNamed(Routes.CREATE_TEAM),
                           ).animate(delay: 600.ms).fade().scale(begin: const Offset(0.9, 0.9)),
@@ -753,7 +765,7 @@ class _DashboardBodyState extends State<_DashboardBody> with TickerProviderState
 
                       // Recent Feed (Real or Mock Data if empty)
                       Builder(builder: (context) {
-                        final items = c.feed.isNotEmpty 
+                        final items = c.feed.isNotEmpty
                             ? c.feed.take(3).map((f) => _MockActivity(
                                   type: f.type,
                                   title: f.type.toUpperCase() == 'RATING'
@@ -761,8 +773,31 @@ class _DashboardBodyState extends State<_DashboardBody> with TickerProviderState
                                       : f.content,
                                   timeAgo: _timeAgo(f.createdAt),
                                   actorName: f.actorName,
-                                )).toList() 
-                            : _getMockFeedItems();
+                                )).toList()
+                            : <_MockActivity>[];
+
+                        if (items.isEmpty) {
+                          return Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: const Color(0x99172A36),
+                              borderRadius: BorderRadius.circular(24),
+                              border: Border.all(
+                                color: Colors.white.withOpacity(0.10),
+                                width: 1,
+                              ),
+                            ),
+                            child: Text(
+                              'No activity yet',
+                              style: GoogleFonts.inter(
+                                color: Colors.white54,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ).animate().fade().slideX(begin: 0.1);
+                        }
 
                         return Column(
                           children: items.map((item) {
@@ -771,12 +806,15 @@ class _DashboardBodyState extends State<_DashboardBody> with TickerProviderState
                             final iconColor = isPerformance ? const Color(0xFF00A1FF) : const Color(0xFFFFD700);
 
 
-                            final titleWidget = c.feed.isNotEmpty
-                                ? Text(
-                                    '${item.actorName} - ${item.title}',
-                                    style: GoogleFonts.inter(color: Colors.white, fontSize: 13, height: 1.4, fontWeight: FontWeight.w400),
-                                  )
-                                : _buildMockRichTextTitle(item.title);
+                            final titleWidget = Text(
+                              '${item.actorName} - ${item.title}',
+                              style: GoogleFonts.inter(
+                                color: Colors.white,
+                                fontSize: 13,
+                                height: 1.4,
+                                fontWeight: FontWeight.w400,
+                              ),
+                            );
 
                             final timeText = item.timeAgo;
 
@@ -931,52 +969,6 @@ class _DashboardBodyState extends State<_DashboardBody> with TickerProviderState
     if (diff.inHours < 24) return '${diff.inHours} hr ago';
     if (diff.inDays < 7) return '${diff.inDays} day${diff.inDays == 1 ? '' : 's'} ago';
     return '${(diff.inDays / 7).floor()} wk ago';
-  }
-
-  List<_MockActivity> _getMockFeedItems() {
-    return [
-      _MockActivity(
-        type: 'PERFORMANCE',
-        title: 'You awarded Sarah Chen +3 in Athlete',
-        timeAgo: '2 min ago',
-        actorName: 'You',
-      ),
-      _MockActivity(
-        type: 'BADGE',
-        title: "Jake Miller earned 'Rising Star' badge",
-        timeAgo: '1 hour ago',
-        actorName: 'Jake Miller',
-      ),
-    ];
-  }
-
-  Widget _buildMockRichTextTitle(String title) {
-    if (title.contains('Sarah Chen +3')) {
-      return RichText(
-        text: TextSpan(
-          style: GoogleFonts.inter(fontSize: 13, height: 1.4, color: Colors.white, fontWeight: FontWeight.w400),
-          children: [
-            const TextSpan(text: 'You awarded '),
-            TextSpan(text: 'Sarah Chen ', style: GoogleFonts.inter(fontWeight: FontWeight.w700)),
-            TextSpan(text: '+3 ', style: GoogleFonts.inter(fontWeight: FontWeight.w700, color: const Color(0xFF00A1FF))),
-            const TextSpan(text: 'in Athlete'),
-          ],
-        ),
-      );
-    } else if (title.contains('Rising Star')) {
-      return RichText(
-        text: TextSpan(
-          style: GoogleFonts.inter(fontSize: 13, height: 1.4, color: Colors.white, fontWeight: FontWeight.w400),
-          children: [
-            TextSpan(text: 'Jake Miller ', style: GoogleFonts.inter(fontWeight: FontWeight.w700)),
-            const TextSpan(text: 'earned '),
-            TextSpan(text: "'Rising Star' ", style: GoogleFonts.inter(fontWeight: FontWeight.w700, color: const Color(0xFFFFD700))),
-            const TextSpan(text: 'badge'),
-          ],
-        ),
-      );
-    }
-    return Text(title, style: GoogleFonts.inter(color: Colors.white, fontSize: 13, height: 1.4));
   }
 
   Widget _buildStatTile({

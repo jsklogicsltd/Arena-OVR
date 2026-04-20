@@ -479,7 +479,14 @@ class PointAwardCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final categoryLabel = (item.category ?? 'PERFORMANCE').toString().toUpperCase().replaceAll(' ', ' ');
+    String mappedCategory(String raw) {
+      final c = raw.trim().toLowerCase();
+      if (c == 'athlete' || c == 'performance' || c == 'competitor') {
+        return 'COMPETITOR';
+      }
+      return raw.toUpperCase();
+    }
+    final categoryLabel = mappedCategory((item.category ?? 'PERFORMANCE').toString());
     final detailLine = item.ratingPointsDescription;
     final coachNoteTrim = item.content.trim();
     final hasCoachNote = coachNoteTrim.isNotEmpty &&
@@ -756,6 +763,13 @@ class NegativeAdjustmentCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    String mappedReason(String raw) {
+      final c = raw.trim().toLowerCase();
+      if (c == 'athlete' || c == 'performance' || c == 'competitor') {
+        return 'Competitor';
+      }
+      return raw;
+    }
     return Opacity(
       opacity: 0.85,
       child: Container(
@@ -797,7 +811,7 @@ class NegativeAdjustmentCard extends StatelessWidget {
                   ),
                   if (item.content.isNotEmpty || item.category != null)
                     Text(
-                      'Reason: ${item.category ?? item.content}',
+                      'Reason: ${mappedReason((item.category ?? item.content).toString())}',
                       style: GoogleFonts.inter(color: Colors.white54, fontSize: 11),
                     ),
                 ],

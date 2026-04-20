@@ -20,6 +20,28 @@ final Map<String, Map<int, Map<String, TierThresholds>>> tierTables = {
 
   // ── SQUAT (lbs) ──────────────────────────────────────────────────────────
   'squat': {
+    7: {
+      'light': const TierThresholds(
+        good: 145, great: 180, allState: 200, allAmerican: 215,
+      ),
+      'medium': const TierThresholds(
+        good: 165, great: 210, allState: 250, allAmerican: 255,
+      ),
+      'heavy': const TierThresholds(
+        good: 195, great: 240, allState: 285, allAmerican: 295,
+      ),
+    },
+    8: {
+      'light': const TierThresholds(
+        good: 160, great: 200, allState: 225, allAmerican: 245,
+      ),
+      'medium': const TierThresholds(
+        good: 185, great: 230, allState: 265, allAmerican: 290,
+      ),
+      'heavy': const TierThresholds(
+        good: 210, great: 250, allState: 300, allAmerican: 330,
+      ),
+    },
     9: {
       'light': const TierThresholds(
         good: 200, great: 250, allState: 275, allAmerican: 300,
@@ -68,6 +90,28 @@ final Map<String, Map<int, Map<String, TierThresholds>>> tierTables = {
 
   // ── BENCH PRESS (lbs) ────────────────────────────────────────────────────
   'bench_press': {
+    7: {
+      'light': const TierThresholds(
+        good: 90, great: 110, allState: 125, allAmerican: 145,
+      ),
+      'medium': const TierThresholds(
+        good: 125, great: 140, allState: 165, allAmerican: 195,
+      ),
+      'heavy': const TierThresholds(
+        good: 160, great: 180, allState: 205, allAmerican: 240,
+      ),
+    },
+    8: {
+      'light': const TierThresholds(
+        good: 100, great: 120, allState: 140, allAmerican: 160,
+      ),
+      'medium': const TierThresholds(
+        good: 135, great: 155, allState: 180, allAmerican: 205,
+      ),
+      'heavy': const TierThresholds(
+        good: 160, great: 190, allState: 220, allAmerican: 250,
+      ),
+    },
     9: {
       'light': const TierThresholds(
         good: 125, great: 150, allState: 175, allAmerican: 200,
@@ -116,6 +160,28 @@ final Map<String, Map<int, Map<String, TierThresholds>>> tierTables = {
 
   // ── POWER CLEAN (lbs) ────────────────────────────────────────────────────
   'power_clean': {
+    7: {
+      'light': const TierThresholds(
+        good: 75, great: 90, allState: 110, allAmerican: 110,
+      ),
+      'medium': const TierThresholds(
+        good: 110, great: 115, allState: 130, allAmerican: 140,
+      ),
+      'heavy': const TierThresholds(
+        good: 135, great: 150, allState: 160, allAmerican: 180,
+      ),
+    },
+    8: {
+      'light': const TierThresholds(
+        good: 85, great: 100, allState: 120, allAmerican: 125,
+      ),
+      'medium': const TierThresholds(
+        good: 110, great: 125, allState: 145, allAmerican: 160,
+      ),
+      'heavy': const TierThresholds(
+        good: 140, great: 160, allState: 170, allAmerican: 200,
+      ),
+    },
     9: {
       'light': const TierThresholds(
         good: 110, great: 125, allState: 150, allAmerican: 160,
@@ -164,6 +230,28 @@ final Map<String, Map<int, Map<String, TierThresholds>>> tierTables = {
 
   // ── DEAD LIFT (lbs) ──────────────────────────────────────────────────────
   'dead_lift': {
+    7: {
+      'light': const TierThresholds(
+        good: 180, great: 215, allState: 235, allAmerican: 250,
+      ),
+      'medium': const TierThresholds(
+        good: 235, great: 255, allState: 290, allAmerican: 300,
+      ),
+      'heavy': const TierThresholds(
+        good: 290, great: 295, allState: 340, allAmerican: 350,
+      ),
+    },
+    8: {
+      'light': const TierThresholds(
+        good: 200, great: 245, allState: 265, allAmerican: 285,
+      ),
+      'medium': const TierThresholds(
+        good: 250, great: 290, allState: 320, allAmerican: 340,
+      ),
+      'heavy': const TierThresholds(
+        good: 305, great: 330, allState: 370, allAmerican: 385,
+      ),
+    },
     9: {
       'light': const TierThresholds(
         good: 250, great: 300, allState: 325, allAmerican: 350,
@@ -216,6 +304,26 @@ final Map<String, Map<int, Map<String, TierThresholds>>> tierTables = {
 
   // ── 40-YARD DASH (seconds — lower is better) ────────────────────────────
   '40_yard_dash': {
+    7: {
+      'standard': const TierThresholds(
+        good: 6.0, great: 5.6, allState: 5.35, allAmerican: 5.2,
+        lowerIsBetter: true,
+      ),
+      'heavy': const TierThresholds(
+        good: 6.25, great: 5.85, allState: 5.65, allAmerican: 5.55,
+        lowerIsBetter: true,
+      ),
+    },
+    8: {
+      'standard': const TierThresholds(
+        good: 5.6, great: 5.25, allState: 5.05, allAmerican: 4.95,
+        lowerIsBetter: true,
+      ),
+      'heavy': const TierThresholds(
+        good: 5.9, great: 5.5, allState: 5.35, allAmerican: 5.25,
+        lowerIsBetter: true,
+      ),
+    },
     9: {
       'standard': const TierThresholds(
         good: 5.25, great: 4.95, allState: 4.75, allAmerican: 4.65,
@@ -258,8 +366,94 @@ final Map<String, Map<int, Map<String, TierThresholds>>> tierTables = {
     },
   },
 
-  // ── 20-YARD DASH / 10-YARD FLY (seconds — lower is better) ──────────────
+  // ── 10-YARD FLY (seconds — lower is better) ─────────────────────────────
+  //
+  // NOTE: Kept legacy key '20_yard_dash' for backward compatibility.
+  '10_yard_fly': {
+    7: {
+      'standard': const TierThresholds(
+        good: 1.35, great: 1.20, allState: 1.15, allAmerican: 1.10,
+        lowerIsBetter: true,
+      ),
+      'heavy': const TierThresholds(
+        good: 1.40, great: 1.30, allState: 1.20, allAmerican: 1.20,
+        lowerIsBetter: true,
+      ),
+    },
+    8: {
+      'standard': const TierThresholds(
+        good: 1.25, great: 1.15, allState: 1.05, allAmerican: 1.05,
+        lowerIsBetter: true,
+      ),
+      'heavy': const TierThresholds(
+        good: 1.30, great: 1.20, allState: 1.15, allAmerican: 1.15,
+        lowerIsBetter: true,
+      ),
+    },
+    9: {
+      'standard': const TierThresholds(
+        good: 1.16, great: 1.07, allState: 1.01, allAmerican: 0.98,
+        lowerIsBetter: true,
+      ),
+      'heavy': const TierThresholds(
+        good: 1.23, great: 1.14, allState: 1.09, allAmerican: 1.07,
+        lowerIsBetter: true,
+      ),
+    },
+    10: {
+      'standard': const TierThresholds(
+        good: 1.14, great: 1.05, allState: 0.99, allAmerican: 0.96,
+        lowerIsBetter: true,
+      ),
+      'heavy': const TierThresholds(
+        good: 1.20, great: 1.11, allState: 1.08, allAmerican: 1.05,
+        lowerIsBetter: true,
+      ),
+    },
+    11: {
+      'standard': const TierThresholds(
+        good: 1.11, great: 1.03, allState: 0.98, allAmerican: 0.95,
+        lowerIsBetter: true,
+      ),
+      'heavy': const TierThresholds(
+        good: 1.17, great: 1.09, allState: 1.07, allAmerican: 1.03,
+        lowerIsBetter: true,
+      ),
+    },
+    12: {
+      'standard': const TierThresholds(
+        good: 1.08, great: 1.01, allState: 0.96, allAmerican: 0.93,
+        lowerIsBetter: true,
+      ),
+      'heavy': const TierThresholds(
+        good: 1.14, great: 1.08, allState: 1.05, allAmerican: 1.02,
+        lowerIsBetter: true,
+      ),
+    },
+  },
+
+  // Legacy alias (old key name used by earlier builds)
   '20_yard_dash': {
+    7: {
+      'standard': const TierThresholds(
+        good: 1.35, great: 1.20, allState: 1.15, allAmerican: 1.10,
+        lowerIsBetter: true,
+      ),
+      'heavy': const TierThresholds(
+        good: 1.40, great: 1.30, allState: 1.20, allAmerican: 1.20,
+        lowerIsBetter: true,
+      ),
+    },
+    8: {
+      'standard': const TierThresholds(
+        good: 1.25, great: 1.15, allState: 1.05, allAmerican: 1.05,
+        lowerIsBetter: true,
+      ),
+      'heavy': const TierThresholds(
+        good: 1.30, great: 1.20, allState: 1.15, allAmerican: 1.15,
+        lowerIsBetter: true,
+      ),
+    },
     9: {
       'standard': const TierThresholds(
         good: 1.16, great: 1.07, allState: 1.01, allAmerican: 0.98,
@@ -304,6 +498,22 @@ final Map<String, Map<int, Map<String, TierThresholds>>> tierTables = {
 
   // ── VERTICAL JUMP (inches — higher is better) ───────────────────────────
   'vertical_jump': {
+    7: {
+      'standard': const TierThresholds(
+        good: 13, great: 22, allState: 24, allAmerican: 27,
+      ),
+      'heavy': const TierThresholds(
+        good: 10, great: 19, allState: 21, allAmerican: 23,
+      ),
+    },
+    8: {
+      'standard': const TierThresholds(
+        good: 15, great: 24, allState: 27, allAmerican: 29,
+      ),
+      'heavy': const TierThresholds(
+        good: 12, great: 21, allState: 23, allAmerican: 25,
+      ),
+    },
     9: {
       'standard': const TierThresholds(
         good: 18, great: 26, allState: 29, allAmerican: 32,
@@ -340,6 +550,22 @@ final Map<String, Map<int, Map<String, TierThresholds>>> tierTables = {
 
   // ── STANDING LONG JUMP (inches — higher is better) ──────────────────────
   'standing_long_jump': {
+    7: {
+      'standard': const TierThresholds(
+        good: 76, great: 84, allState: 86, allAmerican: 90,
+      ),
+      'heavy': const TierThresholds(
+        good: 70, great: 78, allState: 82, allAmerican: 85,
+      ),
+    },
+    8: {
+      'standard': const TierThresholds(
+        good: 83, great: 91, allState: 95, allAmerican: 100,
+      ),
+      'heavy': const TierThresholds(
+        good: 77, great: 86, allState: 88, allAmerican: 95,
+      ),
+    },
     9: {
       'standard': const TierThresholds(
         good: 90, great: 99, allState: 105, allAmerican: 111,

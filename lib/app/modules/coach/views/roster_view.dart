@@ -8,8 +8,8 @@ import '../coach_controller.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/widgets/stadium_background.dart';
 import '../../../core/widgets/glass_card.dart';
-import '../../../core/widgets/fire_sparks_background.dart';
 import '../../../core/components/animated_glowing_border.dart';
+import '../../../core/utils/elite_ovr_style.dart';
 import '../../../data/models/user_model.dart';
 import '../../../routes/app_routes.dart';
 
@@ -354,15 +354,19 @@ class _RosterViewState extends State<RosterView> {
                       final groupLabel = _bucketForPositionGroup(item.positionGroup);
                       final position = '#${item.displayJerseyNumber} · $groupLabel';
                       final int ovr = item.coachVisibleOvr;
+                      final bool isElite = EliteOvrStyle.isEliteOvr(ovr);
                       final bool? trendUp = null; // no real trend signal yet
                       final tierColor = AppColors.getTierColor(ovr);
                       final initials = name.isNotEmpty ? name.substring(0, 1).toUpperCase() : '?';
                       final String? photoUrl = item.profilePicUrl;
 
                       final baseCard = GlassCard(
-                        backgroundColor: const Color(0x0DFFFFFF), // #FFFFFF at 0D (5% approx)
+                        backgroundColor: isElite ? null : const Color(0x0DFFFFFF), // #FFFFFF at 0D (5% approx)
                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                        leftBorderColor: tierColor,
+                        leftBorderColor: isElite ? const Color(0xFFFFE08A) : tierColor,
+                        gradient: isElite ? EliteOvrStyle.eliteCardGradient : null,
+                        borderColor: isElite ? const Color(0xFFFFE08A) : null,
+                        glowColor: isElite ? const Color(0x66FFD700) : null,
                         child: Row(
                           children: [
                             AnimatedGlowingBorder(
@@ -380,15 +384,18 @@ class _RosterViewState extends State<RosterView> {
                                     shape: BoxShape.circle,
                                     border: Border.all(color: tierColor, width: 2),
                                   ),
-                                  child: CircleAvatar(
-                                    radius: 22,
-                                    backgroundColor: Colors.white10,
-                                    backgroundImage: photoUrl != null && photoUrl.isNotEmpty
-                                        ? CachedNetworkImageProvider(photoUrl)
-                                        : null,
-                                    child: photoUrl == null || photoUrl.isEmpty
-                                        ? Text(initials, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold))
-                                        : null,
+                                  child: EliteOvrStyle.tintedAvatar(
+                                    isElite: isElite,
+                                    child: CircleAvatar(
+                                      radius: 22,
+                                      backgroundColor: Colors.white10,
+                                      backgroundImage: photoUrl != null && photoUrl.isNotEmpty
+                                          ? CachedNetworkImageProvider(photoUrl)
+                                          : null,
+                                      child: photoUrl == null || photoUrl.isEmpty
+                                          ? Text(initials, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold))
+                                          : null,
+                                    ),
                                   ),
                                 ),
                               ),
@@ -432,7 +439,7 @@ class _RosterViewState extends State<RosterView> {
                                   children: [
                                     Text(
                                       '$ovr',
-                                      style: GoogleFonts.spaceGrotesk(color: tierColor, fontSize: 24, fontWeight: FontWeight.w900, height: 1.0),
+                                      style: GoogleFonts.spaceGrotesk(color: isElite ? const Color(0xFF2E1E00) : tierColor, fontSize: 24, fontWeight: FontWeight.w900, height: 1.0),
                                     ),
                                     const SizedBox(width: 8),
                                     const Icon(Icons.chevron_right, color: Colors.white24, size: 20),

@@ -38,6 +38,13 @@ class CoachController extends GetxController {
   final RxBool isUpdatingName = false.obs;
   final RxBool isUploadingTeamLogo = false.obs;
 
+  // ── Subscription Status ────────────────────────────────────────────────────
+  final subMaxTeams = 3.obs;
+  final subMaxAthletes = 60.obs;
+  final subCurrentTeams = 0.obs;
+  final subCurrentAthletes = 0.obs;
+  final isLoadingSubStatus = false.obs;
+
   final ImagePicker _picker = ImagePicker();
 
   final RxInt selectedTab = 0.obs;
@@ -59,6 +66,11 @@ class CoachController extends GetxController {
     super.onInit();
     _loadCoachProfile();
     getCoachTeams();
+    // Reload subscription status whenever the active team (and thus schoolId) changes.
+    ever(currentTeam, (_) {
+      final sid = currentTeam.value?.schoolId;
+      if (sid != null && sid.isNotEmpty) loadSubscriptionStatus(sid);
+    });
   }
 
   Future<void> _loadCoachProfile() async {
@@ -85,6 +97,49 @@ class CoachController extends GetxController {
       final roleRaw = data['role'] as String?;
       coachRoleBadge.value = UserModel.coachRoleBadgeUppercase(roleRaw);
       coachActorRoleLabel.value = UserModel.coachRoleTitleForFeed(roleRaw);
+    }
+  }
+
+  /// Fetches school subscription limits and live usage counts for [schoolId].
+  ///
+  /// Uses two parallel Firestore `count()` aggregation queries so we never
+  /// pull full documents just to count rows.
+  Future<void> loadSubscriptionStatus(String schoolId) async {
+    if (schoolId.isEmpty) return;
+    isLoadingSubStatus.value = true;
+    try {
+      // School limits doc + two count queries run concurrently.
+      final results = await Future.wait([
+        _firestore.collection('schools').doc(schoolId).get(),
+        _firestore
+            .collection('teams')
+            .where('schoolId', isEqualTo: schoolId)
+            .count()
+            .get(),
+        _firestore
+            .collection('users')
+            .where('schoolId', isEqualTo: schoolId)
+            .where('role', isEqualTo: 'athlete')
+            .count()
+            .get(),
+      ]);
+
+      final schoolDoc = results[0] as DocumentSnapshot<Map<String, dynamic>>;
+      final teamsAgg = results[1] as AggregateQuerySnapshot;
+      final athletesAgg = results[2] as AggregateQuerySnapshot;
+
+      if (schoolDoc.exists && schoolDoc.data() != null) {
+        subMaxTeams.value =
+            (schoolDoc.data()!['maxTeamsLimit'] as num?)?.toInt() ?? 3;
+        subMaxAthletes.value =
+            (schoolDoc.data()!['maxAthletesLimit'] as num?)?.toInt() ?? 60;
+      }
+      subCurrentTeams.value = teamsAgg.count ?? 0;
+      subCurrentAthletes.value = athletesAgg.count ?? 0;
+    } catch (_) {
+      // Non-critical — silently keep last known values.
+    } finally {
+      isLoadingSubStatus.value = false;
     }
   }
 
@@ -315,10 +370,14 @@ class CoachController extends GetxController {
               final sData = sDoc.data()!;
               sData['id'] = sDoc.id;
               season.value = SeasonModel.fromJson(sData);
+              _bindFeedStream(teamId, seasonStart: season.value?.startDate);
             }
           }, onError: (e) {
             season.value = null;
+            _bindFeedStream(teamId, seasonStart: null);
           });
+        } else {
+          _bindFeedStream(teamId, seasonStart: null);
         }
       }
     }, onError: (e) {
@@ -349,17 +408,25 @@ class CoachController extends GetxController {
       );
     });
 
-    _feedSub = _firestore
+  }
+
+  void _bindFeedStream(String teamId, {DateTime? seasonStart}) {
+    _feedSub?.cancel();
+    Query<Map<String, dynamic>> q = _firestore
         .collection('feed')
-        .where('teamId', isEqualTo: teamId)
-        .orderBy('createdAt', descending: true)
-        .limit(20)
-        .snapshots()
-        .listen((snap) {
-      feed.value = snap.docs.map((d) => FeedModel.fromJson(d.data())).toList();
-    }, onError: (e) {
-      feed.clear();
-    });
+        .where('teamId', isEqualTo: teamId);
+    if (seasonStart != null) {
+      q = q.where(
+        'createdAt',
+        isGreaterThanOrEqualTo: Timestamp.fromDate(seasonStart),
+      );
+    }
+    _feedSub = q.orderBy('createdAt', descending: true).limit(20).snapshots().listen(
+      (snap) {
+        feed.value = snap.docs.map((d) => FeedModel.fromJson(d.data())).toList();
+      },
+      onError: (_) => feed.clear(),
+    );
   }
 
   void _cancelTeamStreams() {
@@ -502,12 +569,77 @@ class CoachController extends GetxController {
     } catch (_) {}
   }
 
+  Future<void> updateTeamSeasonSettings({
+    required int seasonLengthDays,
+    required int startingOvrBaseline,
+  }) async {
+    final team = currentTeam.value;
+    if (team == null) return;
+    await _teamRepo.updateSeasonSettings(
+      teamId: team.id,
+      seasonLengthDays: seasonLengthDays,
+      startingOvrBaseline: startingOvrBaseline,
+    );
+  }
+
+  /// Hard-reset the current season after changing base values.
+  /// Archives all progress and resets every athlete to [startingOvrBaseline].
+  Future<void> resetSeasonWithNewSettings({
+    required int seasonLengthDays,
+    required int startingOvrBaseline,
+  }) async {
+    final team = currentTeam.value;
+    if (team == null) return;
+    final teamId = team.id;
+
+    await _teamRepo.resetSeasonWithNewSettings(
+      teamId: teamId,
+      seasonLengthDays: seasonLengthDays,
+      startingOvrBaseline: startingOvrBaseline,
+    );
+
+    // Refresh local reactive state so the UI updates immediately.
+    try {
+      final teamDoc = await _firestore.collection('teams').doc(teamId).get();
+      if (teamDoc.exists && teamDoc.data() != null) {
+        final tData = teamDoc.data()!;
+        tData['id'] = teamDoc.id;
+        currentTeam.value = TeamModel.fromJson(tData);
+
+        final newSeasonId = currentTeam.value?.currentSeasonId;
+        if (newSeasonId != null) {
+          final seasonDoc =
+              await _firestore.collection('seasons').doc(newSeasonId).get();
+          if (seasonDoc.exists && seasonDoc.data() != null) {
+            final sData = seasonDoc.data()!;
+            sData['id'] = seasonDoc.id;
+            season.value = SeasonModel.fromJson(sData);
+          }
+        }
+      }
+
+      final rosterSnap = await _firestore
+          .collection('users')
+          .where('teamId', isEqualTo: teamId)
+          .where('role', isEqualTo: 'athlete')
+          .get();
+      final list = rosterSnap.docs.map((d) {
+        final data = d.data();
+        data['uid'] = d.id;
+        return UserModel.fromJson(data);
+      }).toList();
+      list.sort((a, b) => b.coachVisibleOvr.compareTo(a.coachVisibleOvr));
+      roster.value = list;
+    } catch (_) {}
+  }
+
   Future<void> postAnnouncement(String content, bool pinned) async {
      if (currentTeam.value == null) return;
      final uid = FirebaseAuth.instance.currentUser?.uid;
      final feedRef = _firestore.collection('feed').doc();
      final team = currentTeam.value!;
      final coachDisplayName = coachName.value.isNotEmpty ? coachName.value : 'Coach';
+     final photo = coachPhotoUrl.value.trim();
      await feedRef.set({
        'id': feedRef.id,
        'teamId': team.id,
@@ -515,6 +647,8 @@ class CoachController extends GetxController {
        'type': 'ANNOUNCEMENT',
        'actorName': coachDisplayName,
        'actorRole': coachActorRoleLabel.value,
+       // Used by feed UI for avatar rendering.
+       'actorProfileUrl': photo.isNotEmpty ? photo : null,
        'targetName': 'Team',
        'content': content,
        'isPinned': pinned,
@@ -571,7 +705,12 @@ class CoachController extends GetxController {
     required List<String> athleteIds,
     required double? squat,
     required double? bench,
+    required double? powerClean,
+    required double? deadLift,
     required double? dash40,
+    required double? fly10,
+    required double? verticalJump,
+    required double? broadJump,
     required double? gpa,
   }) async {
     if (currentTeam.value == null) return;
@@ -594,8 +733,29 @@ class CoachController extends GetxController {
         final s = scoreEventByName('bench_press', grade, pProfile, bench, tierTables);
         if (s != null) powerScores.add(s);
       }
+      if (powerClean != null) {
+        final s = scoreEventByName('power_clean', grade, pProfile, powerClean, tierTables);
+        if (s != null) powerScores.add(s);
+      }
+      if (deadLift != null) {
+        final s = scoreEventByName('dead_lift', grade, pProfile, deadLift, tierTables);
+        if (s != null) powerScores.add(s);
+      }
       if (dash40 != null) {
         final s = scoreEventByName('40_yard_dash', grade, sProfile, dash40, tierTables);
+        if (s != null) speedScores.add(s);
+      }
+      if (fly10 != null) {
+        final s = scoreEventByName('10_yard_fly', grade, sProfile, fly10, tierTables);
+        if (s != null) speedScores.add(s);
+      }
+      if (verticalJump != null) {
+        final s = scoreEventByName('vertical_jump', grade, sProfile, verticalJump, tierTables);
+        if (s != null) speedScores.add(s);
+      }
+      if (broadJump != null) {
+        final s =
+            scoreEventByName('standing_long_jump', grade, sProfile, broadJump, tierTables);
         if (s != null) speedScores.add(s);
       }
 
@@ -603,6 +763,7 @@ class CoachController extends GetxController {
       int? powerNumber;
       int? speedNumber;
       int? topPerfPts;
+      late final Map<String, dynamic> assessmentData;
 
       if (powerScores.isNotEmpty && speedScores.isNotEmpty) {
         final nums = calculateNumbers(powerScores, speedScores);
@@ -610,26 +771,85 @@ class CoachController extends GetxController {
         speedNumber = nums.speedNumber;
         topPerfPts = nums.topPerformancePoints;
         automatedOvr = topPerfPts;
+        assessmentData = <String, dynamic>{
+          if (squat != null) 'squat': squat,
+          if (bench != null) 'bench_press': bench,
+          if (powerClean != null) 'power_clean': powerClean,
+          if (deadLift != null) 'dead_lift': deadLift,
+          if (dash40 != null) '40_yard_dash': dash40,
+          if (fly10 != null) '10_yard_fly': fly10,
+          if (verticalJump != null) 'vertical_jump': verticalJump,
+          if (broadJump != null) 'standing_long_jump': broadJump,
+          if (gpa != null) 'gpa': gpa,
+          'powerNumber': powerNumber,
+          'speedNumber': speedNumber,
+          'topPerformancePoints': topPerfPts,
+          'updatedAt': FieldValue.serverTimestamp(),
+        };
       } else if (powerScores.isNotEmpty) {
         powerNumber = (powerScores.reduce((a, b) => a + b) / powerScores.length).ceil();
         automatedOvr = powerNumber;
+        assessmentData = <String, dynamic>{
+          if (squat != null) 'squat': squat,
+          if (bench != null) 'bench_press': bench,
+          if (powerClean != null) 'power_clean': powerClean,
+          if (deadLift != null) 'dead_lift': deadLift,
+          if (dash40 != null) '40_yard_dash': dash40,
+          if (fly10 != null) '10_yard_fly': fly10,
+          if (verticalJump != null) 'vertical_jump': verticalJump,
+          if (broadJump != null) 'standing_long_jump': broadJump,
+          if (gpa != null) 'gpa': gpa,
+          'powerNumber': powerNumber,
+          'speedNumber': speedNumber,
+          'topPerformancePoints': topPerfPts,
+          'updatedAt': FieldValue.serverTimestamp(),
+        };
       } else if (speedScores.isNotEmpty) {
         speedNumber = (speedScores.reduce((a, b) => a + b) / speedScores.length).ceil();
         automatedOvr = speedNumber;
+        assessmentData = <String, dynamic>{
+          if (squat != null) 'squat': squat,
+          if (bench != null) 'bench_press': bench,
+          if (powerClean != null) 'power_clean': powerClean,
+          if (deadLift != null) 'dead_lift': deadLift,
+          if (dash40 != null) '40_yard_dash': dash40,
+          if (fly10 != null) '10_yard_fly': fly10,
+          if (verticalJump != null) 'vertical_jump': verticalJump,
+          if (broadJump != null) 'standing_long_jump': broadJump,
+          if (gpa != null) 'gpa': gpa,
+          'powerNumber': powerNumber,
+          'speedNumber': speedNumber,
+          'topPerformancePoints': topPerfPts,
+          'updatedAt': FieldValue.serverTimestamp(),
+        };
+      } else if (gpa != null) {
+        final existingBlob = athleteDoc?.assessmentData != null
+            ? Map<String, dynamic>.from(athleteDoc!.assessmentData!)
+            : <String, dynamic>{};
+        powerNumber = (existingBlob['powerNumber'] as num?)?.toInt() ?? 0;
+        speedNumber = (existingBlob['speedNumber'] as num?)?.toInt() ?? 0;
+        topPerfPts = (powerNumber > 0 && speedNumber > 0)
+            ? ((powerNumber + speedNumber) / 2).ceil()
+            : null;
+        automatedOvr = topPerfPts ??
+            (powerNumber > 0
+                ? powerNumber
+                : speedNumber > 0
+                    ? speedNumber
+                    : 0);
+        existingBlob['gpa'] = gpa;
+        existingBlob['powerNumber'] = powerNumber;
+        existingBlob['speedNumber'] = speedNumber;
+        if (topPerfPts != null) {
+          existingBlob['topPerformancePoints'] = topPerfPts;
+        } else {
+          existingBlob.remove('topPerformancePoints');
+        }
+        existingBlob['updatedAt'] = FieldValue.serverTimestamp();
+        assessmentData = existingBlob;
       } else {
         continue;
       }
-
-      final assessmentData = <String, dynamic>{
-        if (squat != null) 'squat': squat,
-        if (bench != null) 'bench_press': bench,
-        if (dash40 != null) '40_yard_dash': dash40,
-        if (gpa != null) 'gpa': gpa,
-        'powerNumber': powerNumber,
-        'speedNumber': speedNumber,
-        'topPerformancePoints': topPerfPts,
-        'updatedAt': FieldValue.serverTimestamp(),
-      };
 
       final ref = _firestore.collection('users').doc(uid);
       batch.update(ref, {
@@ -649,20 +869,35 @@ class CoachController extends GetxController {
       Map<String, Map<String, double?>> data) async {
     if (currentTeam.value == null) return;
 
-    // ── Step A: Score dirty athletes and write raw + automatedOvr ──────────
+    // ── Step A: Score dirty athletes and write raw assessment blobs ─────────
     WriteBatch batch = _firestore.batch();
     int written = 0;
-    final updatedOvrs = <String, int>{};
+    final updatedAssessment = <String, Map<String, dynamic>>{};
 
     for (final entry in data.entries) {
       final uid = entry.key;
       final vals = entry.value;
       final squat = vals['squat'];
       final bench = vals['bench'];
+      final powerClean = vals['powerClean'];
+      final deadLift = vals['deadLift'];
       final dash40 = vals['dash40'];
+      final fly10 = vals['fly10'];
+      final verticalJump = vals['verticalJump'];
+      final broadJump = vals['broadJump'];
       final gpa = vals['gpa'];
 
-      if (squat == null && bench == null && dash40 == null) continue;
+      if (squat == null &&
+          bench == null &&
+          powerClean == null &&
+          deadLift == null &&
+          dash40 == null &&
+          fly10 == null &&
+          verticalJump == null &&
+          broadJump == null &&
+          gpa == null) {
+        continue;
+      }
 
       final athleteDoc = roster.firstWhereOrNull((a) => a.uid == uid);
       final grade = athleteDoc?.grade ?? 10;
@@ -682,51 +917,122 @@ class CoachController extends GetxController {
             'bench_press', grade, pProfile, bench, tierTables);
         if (s != null) powerScores.add(s);
       }
+      if (powerClean != null) {
+        final s = scoreEventByName(
+            'power_clean', grade, pProfile, powerClean, tierTables);
+        if (s != null) powerScores.add(s);
+      }
+      if (deadLift != null) {
+        final s = scoreEventByName(
+            'dead_lift', grade, pProfile, deadLift, tierTables);
+        if (s != null) powerScores.add(s);
+      }
       if (dash40 != null) {
         final s = scoreEventByName(
             '40_yard_dash', grade, sProfile, dash40, tierTables);
         if (s != null) speedScores.add(s);
       }
+      if (fly10 != null) {
+        final s =
+            scoreEventByName('10_yard_fly', grade, sProfile, fly10, tierTables);
+        if (s != null) speedScores.add(s);
+      }
+      if (verticalJump != null) {
+        final s = scoreEventByName(
+            'vertical_jump', grade, sProfile, verticalJump, tierTables);
+        if (s != null) speedScores.add(s);
+      }
+      if (broadJump != null) {
+        final s = scoreEventByName(
+            'standing_long_jump', grade, sProfile, broadJump, tierTables);
+        if (s != null) speedScores.add(s);
+      }
 
-      int automatedOvr;
       int? powerNumber;
       int? speedNumber;
       int? topPerfPts;
+      late final Map<String, dynamic> assessmentData;
 
       if (powerScores.isNotEmpty && speedScores.isNotEmpty) {
         final nums = calculateNumbers(powerScores, speedScores);
         powerNumber = nums.powerNumber;
         speedNumber = nums.speedNumber;
         topPerfPts = nums.topPerformancePoints;
-        automatedOvr = topPerfPts;
+        assessmentData = <String, dynamic>{
+          if (squat != null) 'squat': squat,
+          if (bench != null) 'bench_press': bench,
+          if (powerClean != null) 'power_clean': powerClean,
+          if (deadLift != null) 'dead_lift': deadLift,
+          if (dash40 != null) '40_yard_dash': dash40,
+          if (fly10 != null) '10_yard_fly': fly10,
+          if (verticalJump != null) 'vertical_jump': verticalJump,
+          if (broadJump != null) 'standing_long_jump': broadJump,
+          if (gpa != null) 'gpa': gpa,
+          'powerNumber': powerNumber,
+          'speedNumber': speedNumber,
+          'topPerformancePoints': topPerfPts,
+          'updatedAt': FieldValue.serverTimestamp(),
+        };
       } else if (powerScores.isNotEmpty) {
         powerNumber =
             (powerScores.reduce((a, b) => a + b) / powerScores.length).ceil();
-        automatedOvr = powerNumber;
+        assessmentData = <String, dynamic>{
+          if (squat != null) 'squat': squat,
+          if (bench != null) 'bench_press': bench,
+          if (powerClean != null) 'power_clean': powerClean,
+          if (deadLift != null) 'dead_lift': deadLift,
+          if (dash40 != null) '40_yard_dash': dash40,
+          if (fly10 != null) '10_yard_fly': fly10,
+          if (verticalJump != null) 'vertical_jump': verticalJump,
+          if (broadJump != null) 'standing_long_jump': broadJump,
+          if (gpa != null) 'gpa': gpa,
+          'powerNumber': powerNumber,
+          'speedNumber': speedNumber,
+          'topPerformancePoints': topPerfPts,
+          'updatedAt': FieldValue.serverTimestamp(),
+        };
       } else if (speedScores.isNotEmpty) {
         speedNumber =
             (speedScores.reduce((a, b) => a + b) / speedScores.length).ceil();
-        automatedOvr = speedNumber;
+        assessmentData = <String, dynamic>{
+          if (squat != null) 'squat': squat,
+          if (bench != null) 'bench_press': bench,
+          if (powerClean != null) 'power_clean': powerClean,
+          if (deadLift != null) 'dead_lift': deadLift,
+          if (dash40 != null) '40_yard_dash': dash40,
+          if (fly10 != null) '10_yard_fly': fly10,
+          if (verticalJump != null) 'vertical_jump': verticalJump,
+          if (broadJump != null) 'standing_long_jump': broadJump,
+          if (gpa != null) 'gpa': gpa,
+          'powerNumber': powerNumber,
+          'speedNumber': speedNumber,
+          'topPerformancePoints': topPerfPts,
+          'updatedAt': FieldValue.serverTimestamp(),
+        };
+      } else if (gpa != null) {
+        final existingBlob = athleteDoc?.assessmentData != null
+            ? Map<String, dynamic>.from(athleteDoc!.assessmentData!)
+            : <String, dynamic>{};
+        powerNumber = (existingBlob['powerNumber'] as num?)?.toInt() ?? 0;
+        speedNumber = (existingBlob['speedNumber'] as num?)?.toInt() ?? 0;
+        topPerfPts = (powerNumber > 0 && speedNumber > 0)
+            ? ((powerNumber + speedNumber) / 2).ceil()
+            : null;
+        existingBlob['gpa'] = gpa;
+        existingBlob['powerNumber'] = powerNumber;
+        existingBlob['speedNumber'] = speedNumber;
+        if (topPerfPts != null) {
+          existingBlob['topPerformancePoints'] = topPerfPts;
+        }
+        existingBlob['updatedAt'] = FieldValue.serverTimestamp();
+        assessmentData = existingBlob;
       } else {
         continue;
       }
-
-      updatedOvrs[uid] = automatedOvr;
-
-      final assessmentData = <String, dynamic>{
-        if (squat != null) 'squat': squat,
-        if (bench != null) 'bench_press': bench,
-        if (dash40 != null) '40_yard_dash': dash40,
-        if (gpa != null) 'gpa': gpa,
-        'powerNumber': powerNumber,
-        'speedNumber': speedNumber,
-        'topPerformancePoints': topPerfPts,
-        'updatedAt': FieldValue.serverTimestamp(),
-      };
+      updatedAssessment[uid] = assessmentData;
 
       final ref = _firestore.collection('users').doc(uid);
       batch.update(ref, {
-        'automatedOvr': automatedOvr,
         'assessmentData': assessmentData,
       });
       written++;
@@ -739,55 +1045,85 @@ class CoachController extends GetxController {
 
     if (written > 0 && written % 499 != 0) await batch.commit();
 
-    // ── Step B: Recalculate team-relative FinalOVR for ENTIRE roster ──────
-    // Build a map of every athlete's topPerformancePoints (using the freshly
-    // written values for dirty athletes, existing values for everyone else).
-    final teamPoints = <String, int>{};
-    for (final a in roster) {
-      if (updatedOvrs.containsKey(a.uid)) {
-        teamPoints[a.uid] = updatedOvrs[a.uid]!;
-      } else if (a.automatedOvr != null && a.automatedOvr! > 0) {
-        teamPoints[a.uid] = a.automatedOvr!;
-      }
-    }
-
-    if (teamPoints.isEmpty) return;
-
-    // Determine season phase from days elapsed.
+    // ── Step B: Recalculate FINAL OVR (combined 50/50 curve) for ENTIRE roster
     final seasonStart = season.value?.startDate;
-    SeasonPhase phase;
+    final seasonLengthDays = (currentTeam.value?.seasonLengthDays ??
+            season.value?.seasonLengthDays ??
+            15)
+        .clamp(7, 365);
+    final startingOvrBaseline = (currentTeam.value?.startingOvrBaseline ??
+            season.value?.startingOvrBaseline ??
+            50)
+        .clamp(0, 90);
+    SeasonPhase phase = SeasonPhase.phase3;
     if (seasonStart != null) {
-      final daysElapsed =
-          DateTime.now().difference(seasonStart).inDays.clamp(0, 999);
-      final totalDays = 90;
-      if (daysElapsed < totalDays ~/ 3) {
-        phase = SeasonPhase.phase1;
-      } else if (daysElapsed < (totalDays * 2) ~/ 3) {
-        phase = SeasonPhase.phase2;
-      } else {
-        phase = SeasonPhase.phase3;
-      }
-    } else {
-      phase = SeasonPhase.phase3;
+      final day = DateTime.now().difference(seasonStart).inDays.clamp(0, 999) + 1;
+      phase = phaseForDay(
+        currentDay: day,
+        seasonLengthDays: seasonLengthDays,
+      );
     }
 
-    final ratings = assignOverallRatings(teamPoints, phase);
+    // Build combined score for every athlete (fresh Firestore roster — parity
+    // with RatingRepository._recalculateFinalCurveOvr).
+    final teamId = currentTeam.value!.id;
+    final rosterSnap = await _firestore
+        .collection('users')
+        .where('teamId', isEqualTo: teamId)
+        .where('role', isEqualTo: 'athlete')
+        .get();
 
-    // Batch-update the recalculated automatedOvr for every rated athlete.
+    final combinedByAthlete = <String, double>{};
+    for (final d in rosterSnap.docs) {
+      final data = d.data();
+      data['uid'] = d.id;
+      final a = UserModel.fromJson(data);
+      final uid = a.uid;
+      final manual =
+          (a.actualOvr != null && a.actualOvr! > 0) ? a.actualOvr! : a.ovr;
+
+      final Map<String, dynamic>? blob =
+          updatedAssessment[uid] ?? a.assessmentData;
+      final power = (blob?['powerNumber'] as num?)?.toInt();
+      final speed = (blob?['speedNumber'] as num?)?.toInt();
+      final gpa = (blob?['gpa'] as num?)?.toDouble() ?? 0.0;
+
+      final av = assessmentValue(
+        powerScore: (power ?? 0).clamp(0, 99),
+        speedScore: (speed ?? 0).clamp(0, 99),
+        gpaScoreValue: gpaScore(gpa),
+      );
+      final mv = manualInputValueFromManualOvr(manual);
+      combinedByAthlete[uid] =
+          combinedScore(assessmentValue: av, manualInputValue: mv);
+    }
+
+    if (combinedByAthlete.isEmpty) return;
+
+    final ratings = assignOverallRatingsFromCombinedScore(
+      combinedByAthlete,
+      phase,
+      startingOvrBaseline: startingOvrBaseline,
+    );
+
+    // Persist: finalOvr (single source of truth)
     WriteBatch recalcBatch = _firestore.batch();
     int recalcWritten = 0;
     for (final r in ratings) {
       final ref = _firestore.collection('users').doc(r.playerId);
-      recalcBatch.update(ref, {'automatedOvr': r.overallRating});
+      recalcBatch.update(ref, {'finalOvr': r.overallRating});
       recalcWritten++;
       if (recalcWritten % 499 == 0) {
         await recalcBatch.commit();
         recalcBatch = _firestore.batch();
       }
     }
-    if (recalcWritten > 0 && recalcWritten % 499 != 0) {
-      await recalcBatch.commit();
-    }
+    if (recalcWritten > 0 && recalcWritten % 499 != 0) await recalcBatch.commit();
+
+    final sumCurve = ratings.fold<int>(0, (s, r) => s + r.overallRating);
+    await _firestore.collection('teams').doc(teamId).update({
+      'averageOvr': (sumCurve / ratings.length).round(),
+    });
   }
 
   void logout() async {

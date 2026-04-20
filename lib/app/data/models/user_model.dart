@@ -25,6 +25,8 @@ class UserModel {
   final List<String> badges;
   final bool hasUploadedPic;
   final Map<String, dynamic> currentStreak;
+  final int dailyPoints;
+  final DateTime? lastPointDate;
   final DateTime? createdAt;
   final DateTime? lastActiveAt;
 
@@ -38,6 +40,9 @@ class UserModel {
   // Automated assessment results
   final int? automatedOvr;
   final Map<String, dynamic>? assessmentData;
+  /// Final roster-relative OVR computed by the combined 50/50 curve engine.
+  /// This is the single source of truth for display + leaderboards.
+  final int? finalOvrValue;
 
   UserModel({
     required this.uid,
@@ -63,6 +68,8 @@ class UserModel {
     this.badges = const [],
     this.hasUploadedPic = false,
     this.currentStreak = const {},
+    this.dailyPoints = 0,
+    this.lastPointDate,
     this.createdAt,
     this.lastActiveAt,
     this.grade,
@@ -72,18 +79,23 @@ class UserModel {
     this.speedProfile,
     this.automatedOvr,
     this.assessmentData,
+    this.finalOvrValue,
   });
 
-  /// Merged OVR: averages manual and automated when both exist.
-  /// Falls back to manual-only when no assessment data is present.
+  /// Final OVR used everywhere in UI.
+  ///
+  /// New rule: this must reflect the value computed and saved by the combined
+  /// curve engine (manual + assessment 50/50, roster-relative).
+  ///
+  /// Fallback: if the curve value isn't present yet, use the manual OVR.
   int get finalOvr {
-    final manual = (actualOvr != null && actualOvr! > 0) ? actualOvr! : ovr;
-    if (automatedOvr == null || automatedOvr == 0) return manual;
-    if (manual == 0) return automatedOvr!;
-    return ((manual + automatedOvr!) / 2).round().clamp(0, 99);
+    final curve = finalOvrValue;
+    if (curve != null) return curve.clamp(0, 99);
+    return ((actualOvr != null && actualOvr! > 0) ? actualOvr! : ovr)
+        .clamp(0, 99);
   }
 
-  /// OVR always visible to coaches — uses finalOvr (merged manual + automated).
+  /// OVR always visible to coaches — uses [finalOvr] (curve from objective + subjective).
   int get coachVisibleOvr => finalOvr;
 
   /// Jersey for UI: null, empty, whitespace-only, or literal `"null"` → `"0"`.
@@ -153,6 +165,8 @@ class UserModel {
     List<String>? badges,
     bool? hasUploadedPic,
     Map<String, dynamic>? currentStreak,
+    int? dailyPoints,
+    DateTime? lastPointDate,
     DateTime? createdAt,
     DateTime? lastActiveAt,
     int? grade,
@@ -162,6 +176,7 @@ class UserModel {
     String? speedProfile,
     int? automatedOvr,
     Map<String, dynamic>? assessmentData,
+    int? finalOvrValue,
   }) {
     return UserModel(
       uid: uid ?? this.uid,
@@ -187,6 +202,8 @@ class UserModel {
       badges: badges ?? this.badges,
       hasUploadedPic: hasUploadedPic ?? this.hasUploadedPic,
       currentStreak: currentStreak ?? this.currentStreak,
+      dailyPoints: dailyPoints ?? this.dailyPoints,
+      lastPointDate: lastPointDate ?? this.lastPointDate,
       createdAt: createdAt ?? this.createdAt,
       lastActiveAt: lastActiveAt ?? this.lastActiveAt,
       grade: grade ?? this.grade,
@@ -196,6 +213,7 @@ class UserModel {
       speedProfile: speedProfile ?? this.speedProfile,
       automatedOvr: automatedOvr ?? this.automatedOvr,
       assessmentData: assessmentData ?? this.assessmentData,
+      finalOvrValue: finalOvrValue ?? this.finalOvrValue,
     );
   }
 
@@ -224,6 +242,8 @@ class UserModel {
       badges: json['badges'] != null ? List<String>.from(json['badges']) : [],
       hasUploadedPic: json['hasUploadedPic'] ?? false,
       currentStreak: json['currentStreak'] != null ? Map<String, dynamic>.from(json['currentStreak']) : {},
+      dailyPoints: (json['dailyPoints'] as num?)?.toInt() ?? 0,
+      lastPointDate: json['lastPointDate'] != null ? (json['lastPointDate'] as Timestamp).toDate() : null,
       createdAt: json['createdAt'] != null ? (json['createdAt'] as Timestamp).toDate() : null,
       lastActiveAt: json['lastActiveAt'] != null ? (json['lastActiveAt'] as Timestamp).toDate() : null,
       grade: json['grade'] as int?,
@@ -235,6 +255,7 @@ class UserModel {
       assessmentData: json['assessmentData'] != null
           ? Map<String, dynamic>.from(json['assessmentData'])
           : null,
+      finalOvrValue: (json['finalOvr'] as num?)?.toInt(),
     );
   }
 
@@ -263,6 +284,8 @@ class UserModel {
       'badges': badges,
       'hasUploadedPic': hasUploadedPic,
       'currentStreak': currentStreak,
+      'dailyPoints': dailyPoints,
+      'lastPointDate': lastPointDate != null ? Timestamp.fromDate(lastPointDate!) : null,
       'createdAt': createdAt != null ? Timestamp.fromDate(createdAt!) : null,
       'lastActiveAt': lastActiveAt != null ? Timestamp.fromDate(lastActiveAt!) : null,
       'grade': grade,
@@ -272,6 +295,7 @@ class UserModel {
       'speedProfile': speedProfile,
       'automatedOvr': automatedOvr,
       'assessmentData': assessmentData,
+      'finalOvr': finalOvrValue,
     };
   }
 }

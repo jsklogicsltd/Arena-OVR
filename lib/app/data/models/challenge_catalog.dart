@@ -2,19 +2,27 @@
 class ChallengeCatalog {
   ChallengeCatalog._();
 
+  /// Firestore canonical key retained for backward compatibility.
+  /// UI now displays this as "Competitor".
+  static const String competitorKey = 'Athlete';
+
   static const List<String> parentCategories = [
-    'Athlete',
+    competitorKey,
     'Student',
     'Teammate',
     'Citizen',
   ];
 
-  static const List<String> athlete = [
-    'Strength Improvement',
-    'Speed / Agility Improvement',
-    'Competition Winner',
-    'Strong Practice Performance',
-    'Testing Improvement',
+  static const List<String> competitor = [
+    'Overcomes Mistake Quickly (Next Play Mentality)',
+    'Full-Speed Effort (No Loafs)',
+    'Finishes Every Rep (No Quit)',
+    'Positive Body Language Under Pressure',
+    'Wins One-on-One Matchups',
+    'Second sport - Always Competes',
+    'Positive Response to Coaching',
+    'Extra Work (Self-Driven)',
+    'Executes Under Fatigue',
   ];
 
   static const List<String> citizen = [
@@ -47,7 +55,9 @@ class ChallengeCatalog {
   static List<String> challengesFor(String parentCategory) {
     switch (parentCategory) {
       case 'Athlete':
-        return athlete;
+      case 'Competitor':
+      case 'Performance':
+        return competitor;
       case 'Citizen':
         return citizen;
       case 'Teammate':
@@ -56,6 +66,34 @@ class ChallengeCatalog {
         return student;
       default:
         return const [];
+    }
+  }
+
+  static String displayLabelForCategory(String key) {
+    switch (key) {
+      case 'Athlete':
+      case 'Performance':
+      case 'Competitor':
+        return 'Competitor';
+      default:
+        return key;
+    }
+  }
+
+  static String shortLabelForCategory(String key) {
+    switch (key) {
+      case 'Athlete':
+      case 'Performance':
+      case 'Competitor':
+        return 'Comp';
+      case 'Student':
+        return 'Stu';
+      case 'Teammate':
+        return 'Tm';
+      case 'Citizen':
+        return 'Cit';
+      default:
+        return key;
     }
   }
 }

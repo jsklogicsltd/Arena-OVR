@@ -16,6 +16,8 @@ class TeamModel {
   final String secondaryColor;
   final String? logoUrl;
   final String? currentSeasonId;
+  final int seasonLengthDays; // min 7
+  final int startingOvrBaseline; // min 0, max 90
   final int totalRatingsThisSeason;
   final int averageOvr;
   final DateTime? createdAt;
@@ -36,6 +38,8 @@ class TeamModel {
     required this.secondaryColor,
     this.logoUrl,
     this.currentSeasonId,
+    this.seasonLengthDays = 15,
+    this.startingOvrBaseline = 50,
     this.totalRatingsThisSeason = 0,
     this.averageOvr = 0,
     this.createdAt,
@@ -57,6 +61,8 @@ class TeamModel {
     String? secondaryColor,
     String? logoUrl,
     String? currentSeasonId,
+    int? seasonLengthDays,
+    int? startingOvrBaseline,
     int? totalRatingsThisSeason,
     int? averageOvr,
     DateTime? createdAt,
@@ -77,6 +83,8 @@ class TeamModel {
       secondaryColor: secondaryColor ?? this.secondaryColor,
       logoUrl: logoUrl ?? this.logoUrl,
       currentSeasonId: currentSeasonId ?? this.currentSeasonId,
+      seasonLengthDays: seasonLengthDays ?? this.seasonLengthDays,
+      startingOvrBaseline: startingOvrBaseline ?? this.startingOvrBaseline,
       totalRatingsThisSeason: totalRatingsThisSeason ?? this.totalRatingsThisSeason,
       averageOvr: averageOvr ?? this.averageOvr,
       createdAt: createdAt ?? this.createdAt,
@@ -103,6 +111,8 @@ class TeamModel {
       secondaryColor: json['secondaryColor'] ?? '',
       logoUrl: json['logoUrl'],
       currentSeasonId: json['currentSeasonId'],
+      seasonLengthDays: ((json['seasonLengthDays'] ?? 15) as num).toInt().clamp(7, 365),
+      startingOvrBaseline: ((json['startingOvrBaseline'] ?? 50) as num).toInt().clamp(0, 90),
       totalRatingsThisSeason: json['totalRatingsThisSeason'] ?? 0,
       averageOvr: json['averageOvr'] ?? 0,
       createdAt: json['createdAt'] != null ? (json['createdAt'] as Timestamp).toDate() : null,
@@ -126,6 +136,8 @@ class TeamModel {
       'secondaryColor': secondaryColor,
       'logoUrl': logoUrl,
       'currentSeasonId': currentSeasonId,
+      'seasonLengthDays': seasonLengthDays,
+      'startingOvrBaseline': startingOvrBaseline,
       'totalRatingsThisSeason': totalRatingsThisSeason,
       'averageOvr': averageOvr,
       'createdAt': createdAt != null ? Timestamp.fromDate(createdAt!) : null,

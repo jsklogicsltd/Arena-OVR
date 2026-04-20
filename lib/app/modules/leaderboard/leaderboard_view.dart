@@ -8,8 +8,8 @@ import 'leaderboard_controller.dart';
 import '../player/player_controller.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/widgets/stadium_background.dart';
-import '../../core/widgets/fire_sparks_background.dart';
 import '../../core/components/animated_glowing_border.dart';
+import '../../core/utils/elite_ovr_style.dart';
 import '../../data/models/user_model.dart';
 
 class LeaderboardView extends GetView<LeaderboardController> {
@@ -24,14 +24,6 @@ class LeaderboardView extends GetView<LeaderboardController> {
     }
   }
 
-  double _uiScale(BuildContext context) {
-    // Base width = 390 (typical small phone). Clamp keeps UI readable.
-    final w = MediaQuery.sizeOf(context).width;
-    return (w / 390).clamp(0.85, 1.0);
-  }
-
-  double _s(BuildContext context, double value) => value * _uiScale(context);
-
   @override
   Widget build(BuildContext context) {
     return StadiumBackground(
@@ -44,23 +36,31 @@ class LeaderboardView extends GetView<LeaderboardController> {
               _buildAppBar(context),
               Expanded(
                 child: Obx(() {
-              final pc = _tryPlayerController();
-              if (pc != null && pc.athlete.value?.role == 'athlete') {
-                // Rebuild when season / profile loads (same as athlete dashboard OVR gate).
-                pc.athlete.value;
-                pc.season.value;
-                if (!pc.isOvrTimingReady) {
-                  return _buildAthleteLeaderboardGate(loading: true, pc: pc);
-                }
-                if (!pc.isOvrRevealed) {
-                  return _buildAthleteLeaderboardGate(loading: false, pc: pc);
-                }
-              }
-              if (controller.isLoading.value && controller.ranked.isEmpty) {
-                return const Center(
-                  child: CircularProgressIndicator(color: AppColors.tierGold),
-                );
-              }
+                  final pc = _tryPlayerController();
+                  if (pc != null && pc.athlete.value?.role == 'athlete') {
+                    // Rebuild when season / profile loads (same as athlete dashboard OVR gate).
+                    pc.athlete.value;
+                    pc.season.value;
+                    if (!pc.isOvrTimingReady) {
+                      return _buildAthleteLeaderboardGate(
+                        loading: true,
+                        pc: pc,
+                      );
+                    }
+                    if (!pc.isOvrRevealed) {
+                      return _buildAthleteLeaderboardGate(
+                        loading: false,
+                        pc: pc,
+                      );
+                    }
+                  }
+                  if (controller.isLoading.value && controller.ranked.isEmpty) {
+                    return const Center(
+                      child: CircularProgressIndicator(
+                        color: AppColors.tierGold,
+                      ),
+                    );
+                  }
                   return _buildBody(context);
                 }),
               ),
@@ -71,8 +71,11 @@ class LeaderboardView extends GetView<LeaderboardController> {
     );
   }
 
-  /// Before OVR is revealed (Day 1 / syncing): no tabs, no ranks, no faces, no OVR — matches athlete policy.
-  Widget _buildAthleteLeaderboardGate({required bool loading, required PlayerController pc}) {
+  /// Before OVR is revealed (locked window / syncing): no tabs, no ranks, no faces, no OVR — matches athlete policy.
+  Widget _buildAthleteLeaderboardGate({
+    required bool loading,
+    required PlayerController pc,
+  }) {
     return Center(
       child: SingleChildScrollView(
         padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
@@ -164,7 +167,11 @@ class LeaderboardView extends GetView<LeaderboardController> {
           if (canPop)
             IconButton(
               onPressed: () => Navigator.pop(context),
-              icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 22),
+              icon: const Icon(
+                Icons.arrow_back_ios_new_rounded,
+                color: Colors.white,
+                size: 22,
+              ),
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
             )
@@ -174,7 +181,11 @@ class LeaderboardView extends GetView<LeaderboardController> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.emoji_events_rounded, color: AppColors.tierGold, size: 24),
+                Icon(
+                  Icons.emoji_events_rounded,
+                  color: AppColors.tierGold,
+                  size: 24,
+                ),
                 const SizedBox(width: 8),
                 Text(
                   'LEADERBOARD',
@@ -243,9 +254,7 @@ class LeaderboardView extends GetView<LeaderboardController> {
         height: 53,
         decoration: BoxDecoration(
           color: _tabBarBg,
-          border: Border(
-            bottom: BorderSide(color: _tabBarBorder, width: 1),
-          ),
+          border: Border(bottom: BorderSide(color: _tabBarBorder, width: 1)),
         ),
         child: ClipRect(
           child: BackdropFilter(
@@ -276,7 +285,9 @@ class LeaderboardView extends GetView<LeaderboardController> {
                           width: isSel ? 80 : 0,
                           margin: const EdgeInsets.symmetric(horizontal: 20),
                           decoration: BoxDecoration(
-                            color: isSel ? _tabIndicatorBlue : Colors.transparent,
+                            color: isSel
+                                ? _tabIndicatorBlue
+                                : Colors.transparent,
                             borderRadius: BorderRadius.circular(2),
                           ),
                         ),
@@ -325,13 +336,17 @@ class LeaderboardView extends GetView<LeaderboardController> {
   static const Color _badgeTextDark = Color(0xFF1A1A1A);
 
   Widget _buildPodiumSpot(UserModel u, int rank, {required bool isFirst}) {
+    final elite = EliteOvrStyle.isEliteOvr(u.coachVisibleOvr);
     final size = isFirst ? 100.0 : 80.0;
     final is1 = rank == 1;
     final is2 = rank == 2;
-    final is3 = rank == 3;
-    final borderColor = is1 ? _rank1Border : (is2 ? _rank2Border : _rank3Border);
+    final borderColor = is1
+        ? _rank1Border
+        : (is2 ? _rank2Border : _rank3Border);
     final badgeColor = is1 ? _rank1Badge : (is2 ? _rank2Badge : _rank3Badge);
-    final badgeTextColor = is1 ? _badgeTextDark : (is2 ? _rank2Text : _rank3Text);
+    final badgeTextColor = is1
+        ? _badgeTextDark
+        : (is2 ? _rank2Text : _rank3Text);
     final ovrColor = is1 ? _rank1Border : (is2 ? Colors.white : _rank3Border);
 
     final badge = Container(
@@ -366,7 +381,11 @@ class LeaderboardView extends GetView<LeaderboardController> {
         if (is1) ...[
           Transform.translate(
             offset: const Offset(0, 6),
-            child: Icon(Icons.workspace_premium_rounded, color: _rank1Border, size: 28),
+            child: Icon(
+              Icons.workspace_premium_rounded,
+              color: _rank1Border,
+              size: 28,
+            ),
           ),
         ],
         SizedBox(
@@ -388,7 +407,10 @@ class LeaderboardView extends GetView<LeaderboardController> {
                     height: size,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      border: Border.all(color: borderColor, width: is1 ? 3 : 2.5),
+                      border: Border.all(
+                        color: borderColor,
+                        width: is1 ? 3 : 2.5,
+                      ),
                       boxShadow: is1
                           ? [
                               BoxShadow(
@@ -400,16 +422,23 @@ class LeaderboardView extends GetView<LeaderboardController> {
                           : null,
                     ),
                     child: ClipOval(
-                      child: u.profilePicUrl != null && u.profilePicUrl!.isNotEmpty
-                          ? CachedNetworkImage(
-                              imageUrl: u.profilePicUrl!,
-                              fit: BoxFit.cover,
-                              width: size,
-                              height: size,
-                              placeholder: (_, __) => _avatarPlaceholder(size, borderColor),
-                              errorWidget: (_, __, ___) => _avatarPlaceholder(size, borderColor),
-                            )
-                          : _avatarPlaceholder(size, borderColor),
+                      child: EliteOvrStyle.tintedAvatar(
+                        isElite: elite,
+                        child:
+                            u.profilePicUrl != null &&
+                                u.profilePicUrl!.isNotEmpty
+                            ? CachedNetworkImage(
+                                imageUrl: u.profilePicUrl!,
+                                fit: BoxFit.cover,
+                                width: size,
+                                height: size,
+                                placeholder: (_, __) =>
+                                    _avatarPlaceholder(size, borderColor),
+                                errorWidget: (_, __, ___) =>
+                                    _avatarPlaceholder(size, borderColor),
+                              )
+                            : _avatarPlaceholder(size, borderColor),
+                      ),
                     ),
                   ),
                 ),
@@ -501,7 +530,9 @@ class LeaderboardView extends GetView<LeaderboardController> {
                     final u = elite[i];
                     final rank = 4 + i;
                     return Padding(
-                      padding: EdgeInsets.only(right: i < elite.length - 1 ? gap : 0),
+                      padding: EdgeInsets.only(
+                        right: i < elite.length - 1 ? gap : 0,
+                      ),
                       child: SizedBox(
                         width: cardWidth,
                         child: _buildEliteCard(u, rank, cardWidth: cardWidth),
@@ -524,6 +555,7 @@ class LeaderboardView extends GetView<LeaderboardController> {
   static const Color _eliteOrangeBadge = Color(0xFFFF9800);
 
   Widget _buildEliteCard(UserModel u, int rank, {required double cardWidth}) {
+    final elite = EliteOvrStyle.isEliteOvr(u.coachVisibleOvr);
     final isOrange = (rank - 4) % 2 == 1;
     final borderColor = isOrange ? _eliteOrangeBorder : _eliteGreyBorder;
     final badgeColor = isOrange ? _eliteOrangeBadge : _eliteGreyBadge;
@@ -536,6 +568,17 @@ class LeaderboardView extends GetView<LeaderboardController> {
       mainAxisSize: MainAxisSize.min,
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
+        if (elite)
+          Container(
+            width: cardWidth,
+            height: 2,
+            decoration: BoxDecoration(
+              gradient: EliteOvrStyle.eliteCardGradient,
+              borderRadius: BorderRadius.circular(2),
+              boxShadow: EliteOvrStyle.eliteGlow(alpha: 0.45),
+            ),
+          ),
+        if (elite) const SizedBox(height: 6),
         SizedBox(
           width: circleSize + 4,
           height: circleSize + 14,
@@ -561,16 +604,28 @@ class LeaderboardView extends GetView<LeaderboardController> {
                       child: SizedBox(
                         width: circleSize,
                         height: circleSize,
-                        child: u.profilePicUrl != null && u.profilePicUrl!.isNotEmpty
-                            ? CachedNetworkImage(
-                                imageUrl: u.profilePicUrl!,
-                                fit: BoxFit.cover,
-                                width: circleSize,
-                                height: circleSize,
-                                placeholder: (_, __) => _avatarPlaceholder(circleSize, borderColor),
-                                errorWidget: (_, __, ___) => _avatarPlaceholder(circleSize, borderColor),
-                              )
-                            : _avatarPlaceholder(circleSize, borderColor),
+                        child: EliteOvrStyle.tintedAvatar(
+                          isElite: elite,
+                          child:
+                              u.profilePicUrl != null &&
+                                  u.profilePicUrl!.isNotEmpty
+                              ? CachedNetworkImage(
+                                  imageUrl: u.profilePicUrl!,
+                                  fit: BoxFit.cover,
+                                  width: circleSize,
+                                  height: circleSize,
+                                  placeholder: (_, __) => _avatarPlaceholder(
+                                    circleSize,
+                                    borderColor,
+                                  ),
+                                  errorWidget: (_, __, ___) =>
+                                      _avatarPlaceholder(
+                                        circleSize,
+                                        borderColor,
+                                      ),
+                                )
+                              : _avatarPlaceholder(circleSize, borderColor),
+                        ),
                       ),
                     ),
                   ),
@@ -582,7 +637,10 @@ class LeaderboardView extends GetView<LeaderboardController> {
                 bottom: 4,
                 child: Center(
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 2,
+                    ),
                     decoration: BoxDecoration(
                       color: badgeColor,
                       borderRadius: BorderRadius.circular(4),
@@ -627,189 +685,357 @@ class LeaderboardView extends GetView<LeaderboardController> {
     );
   }
 
-  // Category Leaders: Athlete, Student, Teammate, Citizen
-  static const Color _athBg = Color(0x4D1E3A8A);
-  static const Color _athBorder = Color(0x4D3B82F6);
-  static const Color _athAccent = Color(0xFF93C5FD);
-  static const Color _stuBg = Color(0x4D14532D);
-  static const Color _stuBorder = Color(0x4D22C55E);
-  static const Color _stuAccent = Color(0xFF4ADE80);
-  static const Color _tmBg = Color(0x4D4C1D95);
-  static const Color _tmBorder = Color(0x4D7C3AED);
-  static const Color _tmAccent = Color(0xFFA78BFA);
-  static const Color _citBg = Color(0x4D78350F);
-  static const Color _citBorder = Color(0x4DD97706);
-  static const Color _citAccent = Color(0xFFFB923C);
+  // ── Category leader cards data ──────────────────────────────────────────
+  static const _catCardBg = Color(0xCC141428);
 
   Widget _buildCategoryLeaders() {
     if (controller.ranked.isEmpty) return const SizedBox.shrink();
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'CATEGORY LEADERS',
-          style: GoogleFonts.spaceGrotesk(
-            color: Colors.white,
-            fontSize: 14,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 0.8,
-          ),
-        ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              child: _buildCategoryCard(
-                title: 'ATHLETE',
-                icon: Icons.fitness_center_rounded,
-                backgroundColor: _athBg,
-                borderColor: _athBorder,
-                accentColor: _athAccent,
-                leaderName: controller.categoryLeader('Athlete') != null
-                    ? _shortName(controller.categoryLeader('Athlete')!.name)
-                    : '--',
-                points: controller.categoryLeaderPoints('Athlete').round(),
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: _buildCategoryCard(
-                title: 'STUDENT',
-                icon: Icons.school_rounded,
-                backgroundColor: _stuBg,
-                borderColor: _stuBorder,
-                accentColor: _stuAccent,
-                leaderName: controller.categoryLeader('Student') != null
-                    ? _shortName(controller.categoryLeader('Student')!.name)
-                    : '--',
-                points: controller.categoryLeaderPoints('Student').round(),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 10),
-        Row(
-          children: [
-            Expanded(
-              child: _buildCategoryCard(
-                title: 'TEAMMATE',
-                icon: Icons.handshake_rounded,
-                backgroundColor: _tmBg,
-                borderColor: _tmBorder,
-                accentColor: _tmAccent,
-                leaderName: controller.categoryLeader('Teammate') != null
-                    ? _shortName(controller.categoryLeader('Teammate')!.name)
-                    : '--',
-                points: controller.categoryLeaderPoints('Teammate').round(),
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: _buildCategoryCard(
-                title: 'CITIZEN',
-                icon: Icons.shield_rounded,
-                backgroundColor: _citBg,
-                borderColor: _citBorder,
-                accentColor: _citAccent,
-                leaderName: controller.categoryLeader('Citizen') != null
-                    ? _shortName(controller.categoryLeader('Citizen')!.name)
-                    : '--',
-                points: controller.categoryLeaderPoints('Citizen').round(),
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
 
-  Widget _buildCategoryCard({
-    required String title,
-    required IconData icon,
-    required Color backgroundColor,
-    required Color borderColor,
-    required Color accentColor,
-    required String leaderName,
-    required int points,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: backgroundColor,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: borderColor, width: 1),
+    // Define all 7 entries; order: 4 subjective → 3 objective
+    final entries = <_CatLeaderEntry>[
+      _CatLeaderEntry(
+        title: 'COMPETITOR',
+        icon: Icons.fitness_center_rounded,
+        accent: const Color(0xFF5B8AF5),
+        leader: controller.categoryLeader('Athlete'),
+        displayValue: '${controller.categoryLeaderPoints('Athlete').round()}',
+        suffix: 'PTS',
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                title,
-                style: GoogleFonts.spaceGrotesk(
-                  color: accentColor,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.5,
+      _CatLeaderEntry(
+        title: 'STUDENT',
+        icon: Icons.school_rounded,
+        accent: const Color(0xFF34D399),
+        leader: controller.categoryLeader('Student'),
+        displayValue: '${controller.categoryLeaderPoints('Student').round()}',
+        suffix: 'PTS',
+      ),
+      _CatLeaderEntry(
+        title: 'TEAMMATE',
+        icon: Icons.handshake_rounded,
+        accent: const Color(0xFF9D84F5),
+        leader: controller.categoryLeader('Teammate'),
+        displayValue: '${controller.categoryLeaderPoints('Teammate').round()}',
+        suffix: 'PTS',
+      ),
+      _CatLeaderEntry(
+        title: 'CITIZEN',
+        icon: Icons.shield_rounded,
+        accent: const Color(0xFFE4AA4E),
+        leader: controller.categoryLeader('Citizen'),
+        displayValue: '${controller.categoryLeaderPoints('Citizen').round()}',
+        suffix: 'PTS',
+      ),
+      _CatLeaderEntry(
+        title: 'POWER',
+        icon: Icons.bolt_rounded,
+        accent: const Color(0xFFE07272),
+        leader: controller.objectiveLeader('powerNumber'),
+        displayValue:
+            '${controller.objectiveLeaderValue('powerNumber').round()}',
+        suffix: 'PWR',
+      ),
+      _CatLeaderEntry(
+        title: 'SPEED',
+        icon: Icons.speed_rounded,
+        accent: const Color(0xFF38BDF8),
+        leader: controller.objectiveLeader('speedNumber'),
+        displayValue:
+            '${controller.objectiveLeaderValue('speedNumber').round()}',
+        suffix: 'SPD',
+      ),
+      _CatLeaderEntry(
+        title: 'GPA',
+        icon: Icons.auto_stories_rounded,
+        accent: const Color(0xFF6EE7B7),
+        leader: controller.objectiveLeader('gpa'),
+        displayValue: controller.objectiveLeaderValue('gpa') > 0
+            ? controller.objectiveLeaderValue('gpa').toStringAsFixed(2)
+            : '--',
+        suffix: 'GPA',
+      ),
+    ];
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        const cardW = 110.0;
+        const gap = 10.0;
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 3,
+                  height: 15,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF4A9EFF),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
                 ),
-              ),
-              Icon(icon, color: accentColor, size: 18),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Container(
-                width: 28,
-                height: 28,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: AppColors.tierGold.withValues(alpha: 0.35),
-                  border: Border.all(color: AppColors.tierGold, width: 1),
+                const SizedBox(width: 8),
+                Text(
+                  'CATEGORY LEADERS',
+                  style: GoogleFonts.spaceGrotesk(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.8,
+                  ),
                 ),
-                child: Center(
-                  child: Text(
-                    '1',
-                    style: GoogleFonts.spaceGrotesk(
-                      color: AppColors.tierGold,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w800,
-                    ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            SizedBox(
+              height: 162,
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                physics: const BouncingScrollPhysics(),
+                itemCount: entries.length,
+                itemBuilder: (context, i) => Padding(
+                  padding: EdgeInsets.only(
+                    right: i < entries.length - 1 ? gap : 0,
+                  ),
+                  child: SizedBox(
+                    width: cardW,
+                    child: _buildCategoryCard(entries[i]),
                   ),
                 ),
               ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      leaderName,
-                      style: GoogleFonts.spaceGrotesk(
-                        color: Colors.white,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    Text(
-                      '$points PTS',
-                      style: GoogleFonts.spaceGrotesk(
-                        color: Colors.white70,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildCategoryCard(_CatLeaderEntry e) {
+    final leader = e.leader;
+    final isElite =
+        leader != null && EliteOvrStyle.isEliteOvr(leader.coachVisibleOvr);
+    final hasLeader = leader != null;
+    const avatarSize = 40.0;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: isElite ? null : _catCardBg,
+        gradient: isElite ? EliteOvrStyle.eliteCardGradient : null,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: isElite
+              ? const Color(0xFFFFE08A)
+              : e.accent.withValues(alpha: 0.22),
+          width: 1,
+        ),
+        boxShadow: isElite
+            ? EliteOvrStyle.eliteGlow(alpha: 0.3)
+            : [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.35),
+                  blurRadius: 8,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(14),
+        child: Stack(
+          children: [
+            // Subtle top accent stripe
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: Container(
+                height: 2,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      e.accent.withValues(alpha: 0.9),
+                      e.accent.withValues(alpha: 0.2),
+                    ],
+                  ),
                 ),
               ),
-            ],
-          ),
-        ],
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(10, 12, 10, 10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Header row: icon badge + category label
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Container(
+                        width: 22,
+                        height: 22,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: e.accent.withValues(alpha: 0.14),
+                        ),
+                        child: Icon(e.icon, color: e.accent, size: 12),
+                      ),
+                      const SizedBox(width: 5),
+                      Expanded(
+                        child: Text(
+                          e.title,
+                          style: GoogleFonts.spaceGrotesk(
+                            color: e.accent,
+                            fontSize: 9,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.9,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  // Avatar
+                  SizedBox(
+                    width: avatarSize + 4,
+                    height: avatarSize + 12,
+                    child: Stack(
+                      alignment: Alignment.center,
+                      clipBehavior: Clip.none,
+                      children: [
+                        AnimatedGlowingBorder(
+                          diameter: avatarSize + 4,
+                          borderWidth: 2.5,
+                          duration: const Duration(seconds: 4),
+                          child: Container(
+                            width: avatarSize,
+                            height: avatarSize,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: isElite
+                                    ? const Color(0xFFFFD700)
+                                    : e.accent.withValues(alpha: 0.7),
+                                width: 1.5,
+                              ),
+                            ),
+                            child: ClipOval(
+                              child: hasLeader
+                                  ? EliteOvrStyle.tintedAvatar(
+                                      isElite: isElite,
+                                      child: leader.profilePicUrl != null &&
+                                              leader.profilePicUrl!.isNotEmpty
+                                          ? CachedNetworkImage(
+                                              imageUrl: leader.profilePicUrl!,
+                                              fit: BoxFit.cover,
+                                              width: avatarSize,
+                                              height: avatarSize,
+                                              placeholder: (_, __) =>
+                                                  _catAvatarPlaceholder(
+                                                    avatarSize,
+                                                    e.accent,
+                                                  ),
+                                              errorWidget: (_, __, ___) =>
+                                                  _catAvatarPlaceholder(
+                                                    avatarSize,
+                                                    e.accent,
+                                                  ),
+                                            )
+                                          : _catAvatarPlaceholder(
+                                              avatarSize,
+                                              e.accent,
+                                            ),
+                                    )
+                                  : _catAvatarPlaceholder(avatarSize, e.accent),
+                            ),
+                          ),
+                        ),
+                        // Gold crown overlay for elite or just leader
+                        if (hasLeader)
+                          Positioned(
+                            bottom: 0,
+                            left: 0,
+                            right: 0,
+                            child: Center(
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 5,
+                                  vertical: 1,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: isElite
+                                      ? const Color(0xFFFFD700)
+                                      : e.accent,
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  '#1',
+                                  style: GoogleFonts.spaceGrotesk(
+                                    color: const Color(0xFF0D0D1A),
+                                    fontSize: 8,
+                                    fontWeight: FontWeight.w900,
+                                    letterSpacing: 0.3,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  // Name
+                  Text(
+                    hasLeader ? _shortName(leader.name) : '--',
+                    style: GoogleFonts.spaceGrotesk(
+                      color: Colors.white,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      height: 1.1,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 2),
+                  // Value
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.baseline,
+                    textBaseline: TextBaseline.alphabetic,
+                    children: [
+                      Text(
+                        e.displayValue,
+                        style: GoogleFonts.spaceGrotesk(
+                          color: isElite ? const Color(0xFFFFD700) : e.accent,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                          height: 1.1,
+                        ),
+                      ),
+                      const SizedBox(width: 2),
+                      Text(
+                        e.suffix,
+                        style: GoogleFonts.spaceGrotesk(
+                          color: (isElite
+                                  ? const Color(0xFFFFD700)
+                                  : e.accent)
+                              .withValues(alpha: 0.55),
+                          fontSize: 8,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.4,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
+    );
+  }
+
+  Widget _catAvatarPlaceholder(double size, Color accent) {
+    return Container(
+      color: accent.withValues(alpha: 0.08),
+      child: Icon(Icons.person_rounded, size: size * 0.5, color: accent.withValues(alpha: 0.5)),
     );
   }
 
@@ -849,6 +1075,7 @@ class LeaderboardView extends GetView<LeaderboardController> {
   static const Color _rosterBorder = Color(0xFF222249);
 
   Widget _buildRosterRow(UserModel u, int rank) {
+    final elite = EliteOvrStyle.isEliteOvr(u.coachVisibleOvr);
     final prev = u.previousRank;
     int? move;
     if (prev != null) {
@@ -861,9 +1088,14 @@ class LeaderboardView extends GetView<LeaderboardController> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
       decoration: BoxDecoration(
-        color: _rosterFill,
+        color: elite ? null : _rosterFill,
+        gradient: elite ? EliteOvrStyle.eliteCardGradient : null,
         borderRadius: BorderRadius.circular(48),
-        border: Border.all(color: _rosterBorder, width: 1),
+        border: Border.all(
+          color: elite ? const Color(0xFFFFE08A) : _rosterBorder,
+          width: 1,
+        ),
+        boxShadow: elite ? EliteOvrStyle.eliteGlow(alpha: 0.35) : null,
       ),
       child: Row(
         children: [
@@ -891,17 +1123,26 @@ class LeaderboardView extends GetView<LeaderboardController> {
                 height: 40,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  border: Border.all(color: AppColors.tierSilver.withValues(alpha: 0.5), width: 1),
+                  border: Border.all(
+                    color: AppColors.tierSilver.withValues(alpha: 0.5),
+                    width: 1,
+                  ),
                 ),
                 child: ClipOval(
-                  child: u.profilePicUrl != null && u.profilePicUrl!.isNotEmpty
-                      ? CachedNetworkImage(
-                          imageUrl: u.profilePicUrl!,
-                          fit: BoxFit.cover,
-                          placeholder: (_, __) => _avatarPlaceholder(40, AppColors.tierSilver),
-                          errorWidget: (_, __, ___) => _avatarPlaceholder(40, AppColors.tierSilver),
-                        )
-                      : _avatarPlaceholder(40, AppColors.tierSilver),
+                  child: EliteOvrStyle.tintedAvatar(
+                    isElite: elite,
+                    child:
+                        u.profilePicUrl != null && u.profilePicUrl!.isNotEmpty
+                        ? CachedNetworkImage(
+                            imageUrl: u.profilePicUrl!,
+                            fit: BoxFit.cover,
+                            placeholder: (_, __) =>
+                                _avatarPlaceholder(40, AppColors.tierSilver),
+                            errorWidget: (_, __, ___) =>
+                                _avatarPlaceholder(40, AppColors.tierSilver),
+                          )
+                        : _avatarPlaceholder(40, AppColors.tierSilver),
+                  ),
                 ),
               ),
             ),
@@ -939,7 +1180,7 @@ class LeaderboardView extends GetView<LeaderboardController> {
               Text(
                 '${u.coachVisibleOvr} OVR',
                 style: GoogleFonts.spaceGrotesk(
-                  color: Colors.white,
+                  color: elite ? const Color(0xFF2E1E00) : Colors.white,
                   fontSize: 15,
                   fontWeight: FontWeight.w800,
                 ),
@@ -1079,4 +1320,23 @@ class LeaderboardView extends GetView<LeaderboardController> {
       );
     });
   }
+}
+
+// ── Category leader card data holder ────────────────────────────────────────
+class _CatLeaderEntry {
+  final String title;
+  final IconData icon;
+  final Color accent;
+  final UserModel? leader;
+  final String displayValue;
+  final String suffix;
+
+  const _CatLeaderEntry({
+    required this.title,
+    required this.icon,
+    required this.accent,
+    required this.leader,
+    required this.displayValue,
+    required this.suffix,
+  });
 }

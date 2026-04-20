@@ -1,13 +1,14 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:pin_code_fields/pin_code_fields.dart';
-import '../../core/constants/app_assets.dart';
+import '../../core/widgets/app_logo.dart';
 import '../../core/widgets/stadium_background.dart';
 import '../../core/widgets/arena_button.dart';
-import '../../core/widgets/fire_sparks_background.dart';
+// import '../../core/widgets/fire_sparks_background.dart';
 import 'invite_code_controller.dart';
 import '../../data/models/user_model.dart';
 import '../../data/repositories/auth_repository.dart' as import_repo;
@@ -62,7 +63,7 @@ class InviteCodeView extends GetView<InviteCodeController> {
                         // Hero Logo
                         Hero(
                               tag: 'app_logo',
-                              child: Image.asset(AppAssets.logo, width: 140),
+                              child: const AppLogo(width: 140),
                             )
                             .animate()
                             .fade(duration: 1200.ms, curve: Curves.easeOutQuint)
@@ -195,8 +196,13 @@ class InviteCodeView extends GetView<InviteCodeController> {
                               key: ValueKey<int>(controller.clearTrigger),
                               length: 6,
                               pinController: controller.pinInputController,
-                              keyboardType: TextInputType.text,
+                              // iOS: ensure the keyboard supports letters + numbers for mixed invite codes.
+                              keyboardType: TextInputType.visiblePassword,
                               textCapitalization: TextCapitalization.characters,
+                              inputFormatters: [
+                                FilteringTextInputFormatter.allow(
+                                    RegExp(r'[A-Za-z0-9]')),
+                              ],
                               builder: (context, cells) {
                                 return FittedBox(
                                   fit: BoxFit.scaleDown,

@@ -53,11 +53,18 @@
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>Arena Ovr needs permission to save photos to your library.</string>
 	<!-- Push notifications (Firebase Cloud Messaging) -->
+	<key>FirebaseAppDelegateProxyEnabled</key>
+	<true/>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>fetch</string>
 		<string>remote-notification</string>
 	</array>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Arena Ovr uses local network access to support nearby development and notification diagnostics when enabled.</string>
+	<!-- Export compliance -->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<!-- Allow HTTP for local/dev if needed (optional) -->
 	<key>NSAppTransportSecurity</key>
 	<dict>

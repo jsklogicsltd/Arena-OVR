@@ -3,9 +3,14 @@
 /// Implements the three main calculation steps:
 ///   Step 4 — [scoreEvent]: raw performance value → Performance Points (30–99).
 ///   Step 5 — [calculateNumbers]: per-athlete POWER / SPEED / Top Performance Points.
-///   Step 6 — [assignOverallRatings]: team-wide relative OVR ranking.
+///   Step 6/7 — [assignOverallRatings]: team-wide relative OVR ranking.
 ///
-/// Reference: OVR99 Technical Implementation Guide, Section 3.
+/// Updated April 2026 to support Grade 7–8 tier tables and the locked-in
+/// 50/50 "grading on a curve" combined engine:
+/// - Assessment Value (max 49.50) + Manual Input Value (max 49.50)
+/// - Highest combined score on roster scales to phase cap, others proportional.
+///
+/// Reference: OVR99 Formula Reference v2.0 (April 2026).
 
 import 'dart:math';
 
@@ -71,23 +76,90 @@ class PlayerRating {
 
 /// The three season phases and their corresponding OVR caps.
 ///
-/// ```text
-/// Phase 1  →  1/3 through season  →  cap 79
-/// Phase 2  →  2/3 through season  →  cap 89
-/// Phase 3  →  end of season       →  cap 99
-/// ```
+/// Caps are now derived from each team's starting baseline:
+/// phase 1/2 progressively unlock from baseline toward 99, phase 3 = 99.
 enum SeasonPhase { phase1, phase2, phase3 }
 
-/// Returns the OVR ceiling for the given [phase].
-int phaseCap(SeasonPhase phase) {
+/// Returns the OVR ceiling for the given [phase] and team baseline.
+int phaseCap(SeasonPhase phase, {int startingOvrBaseline = 50}) {
+  final baseline = startingOvrBaseline.clamp(0, 90);
+  final earnablePoints = 99 - baseline;
+  final phase1Cap = baseline + (earnablePoints / 3.0).floor();
+  final phase2Cap = baseline + ((earnablePoints * 2.0) / 3.0).floor();
   switch (phase) {
     case SeasonPhase.phase1:
-      return 79;
+      return phase1Cap;
     case SeasonPhase.phase2:
-      return 89;
+      return phase2Cap;
     case SeasonPhase.phase3:
       return 99;
   }
+}
+
+SeasonPhase phaseForDay({
+  required int currentDay,
+  required int seasonLengthDays,
+}) {
+  final seasonLen = seasonLengthDays.clamp(7, 365);
+  final day = currentDay.clamp(1, seasonLen);
+  final phase1EndDay = (seasonLen / 3.0).ceil();
+  final phase2EndDay = ((seasonLen * 2.0) / 3.0).ceil();
+  if (day <= phase1EndDay) return SeasonPhase.phase1;
+  if (day <= phase2EndDay) return SeasonPhase.phase2;
+  return SeasonPhase.phase3;
+}
+
+// ---------------------------------------------------------------------------
+// Step 5C — GPA score (0..99)
+// ---------------------------------------------------------------------------
+
+/// Converts GPA (0.0..4.0+) to a score on a 0..99 scale.
+///
+/// - GPA ≤ 0.0 → 0
+/// - GPA ≥ 3.5 → 99
+/// - Else: `ceil((gpa / 3.5) * 99)`
+int gpaScore(double gpa) {
+  if (gpa <= 0) return 0;
+  if (gpa >= 3.5) return 99;
+  return ((gpa / 3.5) * 99).ceil().clamp(0, 99);
+}
+
+// ---------------------------------------------------------------------------
+// Step 5D — Assessment Value (decimal; max 49.50)
+// ---------------------------------------------------------------------------
+
+/// Assessment Value represents exactly 50% of a player's total OVR potential.
+///
+/// \[
+/// assessmentValue = (powerScore * 0.20) + (speedScore * 0.20) + (gpaScore * 0.10)
+/// \]
+double assessmentValue({
+  required int powerScore,
+  required int speedScore,
+  required int gpaScoreValue,
+}) {
+  return (powerScore * 0.20) + (speedScore * 0.20) + (gpaScoreValue * 0.10);
+}
+
+/// Manual Input Value represents the other 50% of the player's total OVR potential.
+///
+/// The app stores manual ratings as a 0..99-style score (manual OVR). To convert
+/// that into a 50% contribution we scale by 0.50, producing 0..49.50.
+double manualInputValueFromManualOvr(int manualOvr) {
+  final m = manualOvr.clamp(0, 99);
+  return m * 0.50;
+}
+
+/// Combined Score fed into the curve engine.
+///
+/// \[
+/// combinedScore = assessmentValue + manualInputValue
+/// \]
+double combinedScore({
+  required double assessmentValue,
+  required double manualInputValue,
+}) {
+  return assessmentValue + manualInputValue;
 }
 
 // ---------------------------------------------------------------------------
@@ -184,12 +256,12 @@ AthleteNumbers calculateNumbers(
 }
 
 // ---------------------------------------------------------------------------
-// Step 6 — Assign team-relative Overall Ratings
+// Step 6/7 — Assign team-relative Overall Ratings (curve)
 // ---------------------------------------------------------------------------
 
 /// Ranks all players on a team and assigns OVR ratings relative to the leader.
 ///
-/// **Formula:** `OVR = ceil((playerTopPerfPts / highestTopPerfPts) × phaseCap)`
+/// **Formula:** `OVR = ceil((playerValue / highestValue) × phaseCap)`
 ///
 /// The list is returned sorted by [PlayerRating.overallRating] descending.
 ///
@@ -202,10 +274,12 @@ AthleteNumbers calculateNumbers(
 List<PlayerRating> assignOverallRatings(
   Map<String, int> playerPoints, // playerId → Top Performance Points
   SeasonPhase phase,
+  {int startingOvrBaseline = 50}
 ) {
   if (playerPoints.isEmpty) return [];
 
-  final int cap = phaseCap(phase);
+  final baseline = startingOvrBaseline.clamp(0, 90);
+  final int cap = phaseCap(phase, startingOvrBaseline: baseline);
   final int highest = playerPoints.values.reduce(max);
 
   if (highest <= 0) {
@@ -213,17 +287,68 @@ List<PlayerRating> assignOverallRatings(
         .map((e) => PlayerRating(
               playerId: e.key,
               topPerformancePoints: e.value,
-              overallRating: 0,
+              overallRating: baseline,
             ))
         .toList();
   }
 
   return playerPoints.entries.map((entry) {
-    final double raw = (entry.value / highest) * cap;
-    final int ovr = min(cap, raw.ceil());
+    final score = entry.value <= 0 ? 0 : entry.value;
+    final raw = (score / highest) * (cap - baseline);
+    final finalOvr = baseline + raw.ceil();
+    final ovr = finalOvr.clamp(baseline, cap);
     return PlayerRating(
       playerId: entry.key,
       topPerformancePoints: entry.value,
+      overallRating: ovr,
+    );
+  }).toList()
+    ..sort((a, b) => b.overallRating.compareTo(a.overallRating));
+}
+
+/// Curve-engine for the locked 50/50 Combined Score model.
+///
+/// Each player must have a **combined score** (decimal). The team leader
+/// (highest combined score) gets the phase cap; everyone else scales
+/// proportionally.
+///
+/// \[
+/// ovr = clamp(
+///   baseline + ceil((combined / highestCombined) * (cap - baseline)),
+///   baseline,
+///   cap
+/// )
+/// \]
+List<PlayerRating> assignOverallRatingsFromCombinedScore(
+  Map<String, double> combinedScores, // playerId → combinedScore (decimal)
+  SeasonPhase phase, {
+  int startingOvrBaseline = 50,
+}
+) {
+  if (combinedScores.isEmpty) return [];
+
+  final baseline = startingOvrBaseline.clamp(0, 90);
+  final int cap = phaseCap(phase, startingOvrBaseline: baseline);
+  final double highest = combinedScores.values.reduce(max);
+  if (highest <= 0) {
+    return combinedScores.entries
+        .map((e) => PlayerRating(
+              playerId: e.key,
+              topPerformancePoints: e.value.round(),
+              overallRating: baseline,
+            ))
+        .toList()
+      ..sort((a, b) => b.overallRating.compareTo(a.overallRating));
+  }
+
+  return combinedScores.entries.map((e) {
+    final double score = e.value <= 0 ? 0 : e.value;
+    final double raw = (score / highest) * (cap - baseline);
+    final int finalOvr = baseline + raw.ceil();
+    final int ovr = finalOvr.clamp(baseline, cap);
+    return PlayerRating(
+      playerId: e.key,
+      topPerformancePoints: e.value.round(),
       overallRating: ovr,
     );
   }).toList()

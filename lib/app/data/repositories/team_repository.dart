@@ -48,13 +48,16 @@ class TeamRepository {
     );
 
     final now = DateTime.now();
+    final seasonLengthDays = teamWithCode.seasonLengthDays.clamp(7, 365);
+    final startingOvrBaseline = teamWithCode.startingOvrBaseline.clamp(0, 90);
     final seasonData = {
       'id': newSeasonRef.id,
       'teamId': newTeamRef.id,
       'name': 'Season 1',
       'startDate': Timestamp.fromDate(now),
-      // 15-day season (day 1..15) => end date is start + 14 days
-      'endDate': Timestamp.fromDate(now.add(const Duration(days: 14))),
+      'endDate': Timestamp.fromDate(now.add(Duration(days: seasonLengthDays - 1))),
+      'seasonLengthDays': seasonLengthDays,
+      'startingOvrBaseline': startingOvrBaseline,
       'isActive': true,
     };
 
@@ -94,14 +97,159 @@ class TeamRepository {
     await _provider.firestore.collection('teams').doc(teamId).update(updates);
   }
 
+  Future<void> updateSeasonSettings({
+    required String teamId,
+    required int seasonLengthDays,
+    required int startingOvrBaseline,
+  }) async {
+    final safeSeasonLength = seasonLengthDays.clamp(7, 365);
+    final safeBaseline = startingOvrBaseline.clamp(0, 90);
+    final teamRef = _provider.firestore.collection('teams').doc(teamId);
+    final teamDoc = await teamRef.get();
+    if (!teamDoc.exists || teamDoc.data() == null) return;
+
+    final currentSeasonId = teamDoc.data()!['currentSeasonId'] as String?;
+    final updates = <String, dynamic>{
+      'seasonLengthDays': safeSeasonLength,
+      'startingOvrBaseline': safeBaseline,
+    };
+
+    final batch = _provider.firestore.batch();
+    batch.update(teamRef, updates);
+    if (currentSeasonId != null && currentSeasonId.isNotEmpty) {
+      final seasonRef = _provider.firestore.collection('seasons').doc(currentSeasonId);
+      final seasonSnap = await seasonRef.get();
+      final startTs = seasonSnap.data()?['startDate'] as Timestamp?;
+      if (startTs != null) {
+        final start = startTs.toDate();
+        batch.update(seasonRef, {
+          'seasonLengthDays': safeSeasonLength,
+          'startingOvrBaseline': safeBaseline,
+          'endDate': Timestamp.fromDate(
+            start.add(Duration(days: safeSeasonLength - 1)),
+          ),
+        });
+      } else {
+        batch.update(seasonRef, {
+          'seasonLengthDays': safeSeasonLength,
+          'startingOvrBaseline': safeBaseline,
+        });
+      }
+    }
+    await batch.commit();
+  }
+
+  /// Hard-reset the season after changing base settings (season length / starting OVR).
+  /// Writes the new values to the team + season docs, archives all current transactions,
+  /// creates a fresh season document, and resets every athlete to the new baseline.
+  Future<void> resetSeasonWithNewSettings({
+    required String teamId,
+    required int seasonLengthDays,
+    required int startingOvrBaseline,
+  }) async {
+    final safeSeasonLength = seasonLengthDays.clamp(7, 365);
+    final safeBaseline = startingOvrBaseline.clamp(0, 90);
+
+    final teamRef = _provider.firestore.collection('teams').doc(teamId);
+    final teamDoc = await teamRef.get();
+    if (!teamDoc.exists || teamDoc.data() == null) return;
+    final teamData = teamDoc.data()!;
+    final currentSeasonId = teamData['currentSeasonId'] as String?;
+
+    WriteBatch batch = _provider.firestore.batch();
+    int ops = 0;
+    Future<void> flushIfNeeded() async {
+      if (ops >= 450) {
+        await batch.commit();
+        batch = _provider.firestore.batch();
+        ops = 0;
+      }
+    }
+
+    // 1. Archive old season + transactions
+    if (currentSeasonId != null && currentSeasonId.isNotEmpty) {
+      final oldSeasonRef =
+          _provider.firestore.collection('seasons').doc(currentSeasonId);
+      batch.update(oldSeasonRef, {
+        'isActive': false,
+        'endDate': FieldValue.serverTimestamp(),
+      });
+      ops++;
+      await flushIfNeeded();
+
+      final txSnapshot = await _provider.firestore
+          .collection('transactions')
+          .where('teamId', isEqualTo: teamId)
+          .where('seasonId', isEqualTo: currentSeasonId)
+          .where('isArchived', isEqualTo: false)
+          .get();
+      for (var doc in txSnapshot.docs) {
+        batch.update(doc.reference, {'isArchived': true});
+        ops++;
+        await flushIfNeeded();
+      }
+    }
+
+    // 2. Create fresh season doc with new values
+    final newSeasonRef = _provider.firestore.collection('seasons').doc();
+    final seasonCount = await _provider.firestore
+        .collection('seasons')
+        .where('teamId', isEqualTo: teamId)
+        .get();
+    final newStart = DateTime.now();
+    batch.set(newSeasonRef, {
+      'id': newSeasonRef.id,
+      'teamId': teamId,
+      'name': 'Season ${seasonCount.size + 1}',
+      'startDate': Timestamp.fromDate(newStart),
+      'endDate': Timestamp.fromDate(
+        newStart.add(Duration(days: safeSeasonLength - 1)),
+      ),
+      'seasonLengthDays': safeSeasonLength,
+      'startingOvrBaseline': safeBaseline,
+      'isActive': true,
+    });
+    ops++;
+    await flushIfNeeded();
+
+    // 3. Update team doc with new settings + point to new season
+    batch.update(teamRef, {
+      'currentSeasonId': newSeasonRef.id,
+      'seasonLengthDays': safeSeasonLength,
+      'startingOvrBaseline': safeBaseline,
+      'averageOvr': safeBaseline,
+      'totalRatingsThisSeason': 0,
+    });
+    ops++;
+    await flushIfNeeded();
+
+    // 4. Reset every athlete to the new baseline
+    final athletesSnap = await _provider.firestore
+        .collection('users')
+        .where('teamId', isEqualTo: teamId)
+        .where('role', isEqualTo: 'athlete')
+        .get();
+    final athletePayload = _athleteSeasonResetUpdates(safeBaseline);
+    for (var doc in athletesSnap.docs) {
+      batch.update(doc.reference, athletePayload);
+      ops++;
+      await flushIfNeeded();
+    }
+
+    if (ops > 0) await batch.commit();
+  }
+
   /// Single-document payload for an athlete when starting a new season.
   /// Must stay aligned with [CoachController.submitBulkAssessments] / manual entry
   /// (`assessmentData` map: squat, bench_press, 40_yard_dash, gpa, powerNumber, …).
-  static Map<String, dynamic> _athleteSeasonResetUpdates() {
+  static Map<String, dynamic> _athleteSeasonResetUpdates(int baseline) {
+    final base = baseline.clamp(0, 90);
     return {
-      // Manual OVR must reset to the base starting value (50), not 0.
-      'ovr': 50,
-      'actualOvr': 50,
+      // Manual OVR resets to team baseline.
+      'ovr': base,
+      'actualOvr': base,
+      // Combined curve OVR baseline.
+      'finalOvr': base,
       'ovrDay': null,
       'ovrCap': null,
       'currentRating': <String, dynamic>{},
@@ -118,8 +266,13 @@ class TeamRepository {
       'squat': FieldValue.delete(),
       'bench': FieldValue.delete(),
       'bench_press': FieldValue.delete(),
+      'power_clean': FieldValue.delete(),
+      'dead_lift': FieldValue.delete(),
       'dash40': FieldValue.delete(),
       '40_yard_dash': FieldValue.delete(),
+      '10_yard_fly': FieldValue.delete(),
+      'vertical_jump': FieldValue.delete(),
+      'standing_long_jump': FieldValue.delete(),
       'gpa': FieldValue.delete(),
     };
   }
@@ -130,6 +283,10 @@ class TeamRepository {
 
     final teamData = teamDoc.data()!;
     final currentSeasonId = teamData['currentSeasonId'];
+    final seasonLengthDays =
+        ((teamData['seasonLengthDays'] ?? 15) as num).toInt().clamp(7, 365);
+    final startingOvrBaseline =
+        ((teamData['startingOvrBaseline'] ?? 50) as num).toInt().clamp(0, 90);
     // Firestore WriteBatch limit is 500 ops. This reset can touch many docs, so we
     // commit in chunks to avoid limit failures while still keeping operations tight.
     WriteBatch batch = _provider.firestore.batch();
@@ -171,8 +328,12 @@ class TeamRepository {
       'teamId': teamId,
       'name': newSeasonName,
       'startDate': Timestamp.fromDate(newStart),
-      // 15-day season (day 1..15) => end date is start + 14 days
-      'endDate': Timestamp.fromDate(newStart.add(const Duration(days: 14))),
+      // Inclusive duration: e.g. 15 => start + 14.
+      'endDate': Timestamp.fromDate(
+        newStart.add(Duration(days: seasonLengthDays - 1)),
+      ),
+      'seasonLengthDays': seasonLengthDays,
+      'startingOvrBaseline': startingOvrBaseline,
       'isActive': true,
     });
     ops++;
@@ -180,6 +341,8 @@ class TeamRepository {
 
     batch.update(_provider.firestore.collection('teams').doc(teamId), {
       'currentSeasonId': newSeasonRef.id,
+      'averageOvr': startingOvrBaseline,
+      'totalRatingsThisSeason': 0,
     });
     ops++;
     await flushIfNeeded();
@@ -189,7 +352,7 @@ class TeamRepository {
         .where('role', isEqualTo: 'athlete')
         .get();
         
-    final athletePayload = _athleteSeasonResetUpdates();
+    final athletePayload = _athleteSeasonResetUpdates(startingOvrBaseline);
     for (var doc in athletesSnap.docs) {
       batch.update(doc.reference, athletePayload);
       ops++;

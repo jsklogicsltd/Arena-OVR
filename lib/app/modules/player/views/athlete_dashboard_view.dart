@@ -12,6 +12,8 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/widgets/stadium_background.dart';
 import '../../../core/components/animated_glowing_border.dart';
 import '../../../core/widgets/periodic_shimmer_bar.dart';
+import '../../../core/widgets/badge_trophy_case.dart';
+import '../../../core/utils/elite_ovr_style.dart';
 import '../../../data/models/feed_model.dart';
 import '../../../data/models/user_model.dart';
 
@@ -80,7 +82,7 @@ class _DashboardBodyState extends State<_DashboardBody>
   void _setupBarAnims(UserModel a) {
     const maxScore = 100.0;
     final r   = a.currentRating;
-    final ath = ((r['Athlete']  ?? r['Performance'] ?? 0) as num).toDouble();
+    final ath = ((r['Athlete']  ?? r['Competitor'] ?? r['Performance'] ?? 0) as num).toDouble();
     final stu = ((r['Student']  ?? r['Class']       ?? 0) as num).toDouble();
     final tm  = ((r['Teammate'] ?? r['Program']     ?? 0) as num).toDouble();
     final cit = ((r['Citizen']  ?? r['Standard']    ?? 0) as num).toDouble();
@@ -106,7 +108,7 @@ class _DashboardBodyState extends State<_DashboardBody>
   Widget build(BuildContext context) {
     final athlete = widget.athlete;
     final r       = athlete.currentRating;
-    final ath     = ((r['Athlete']  ?? r['Performance'] ?? 0) as num).toInt();
+    final ath     = ((r['Athlete']  ?? r['Competitor'] ?? r['Performance'] ?? 0) as num).toInt();
     final stu     = ((r['Student']  ?? r['Class']       ?? 0) as num).toInt();
     final tm      = ((r['Teammate'] ?? r['Program']     ?? 0) as num).toInt();
     final cit     = ((r['Citizen']  ?? r['Standard']    ?? 0) as num).toInt();
@@ -207,6 +209,20 @@ class _DashboardBodyState extends State<_DashboardBody>
 
               Obx(() {
                 final items = _recentRatingItems(c);
+                if (items.isEmpty) {
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 24),
+                    child: Center(
+                      child: Text(
+                        'No ratings yet. Your coach hasn\'t awarded points.',
+                        style: GoogleFonts.spaceGrotesk(
+                          color: Colors.white38,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                  ).animate(delay: 550.ms).fade(duration: 400.ms);
+                }
                 return Column(
                   children: items.asMap().entries.map((e) =>
                     _buildRecentRatingCard(e.value)
@@ -228,6 +244,7 @@ class _DashboardBodyState extends State<_DashboardBody>
   // ── Header ───────────────────────────────────────────────────────────────────
 
   Widget _buildHeader(UserModel athlete) {
+    final elite = EliteOvrStyle.isEliteOvr(athlete.coachVisibleOvr);
     return Row(
       children: [
         // Avatar with gold ring
@@ -250,21 +267,24 @@ class _DashboardBodyState extends State<_DashboardBody>
                   end: Alignment.bottomRight,
                 ),
               ),
-              child: CircleAvatar(
-                backgroundColor: const Color(0xFF1E293B),
-                backgroundImage: athlete.profilePicUrl != null
-                    ? CachedNetworkImageProvider(athlete.profilePicUrl!)
-                    : null,
-                child: athlete.profilePicUrl == null
-                    ? Text(
-                        athlete.name.isNotEmpty ? athlete.name[0].toUpperCase() : 'A',
-                        style: GoogleFonts.spaceGrotesk(
-                          color: Colors.white,
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      )
-                    : null,
+              child: EliteOvrStyle.tintedAvatar(
+                isElite: elite,
+                child: CircleAvatar(
+                  backgroundColor: const Color(0xFF1E293B),
+                  backgroundImage: athlete.profilePicUrl != null
+                      ? CachedNetworkImageProvider(athlete.profilePicUrl!)
+                      : null,
+                  child: athlete.profilePicUrl == null
+                      ? Text(
+                          athlete.name.isNotEmpty ? athlete.name[0].toUpperCase() : 'A',
+                          style: GoogleFonts.spaceGrotesk(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        )
+                      : null,
+                ),
               ),
             ),
           ),
@@ -390,6 +410,7 @@ class _DashboardBodyState extends State<_DashboardBody>
   }
 
   Widget _buildOvrHeroCard(UserModel athlete) {
+    final isElite = EliteOvrStyle.isEliteOvr(athlete.coachVisibleOvr);
     final ovrResolved = c.isOvrDisplayResolved;
     final displayedOvr = c.displayedOvr;
     final isHidden   = ovrResolved && displayedOvr == null;
@@ -401,6 +422,7 @@ class _DashboardBodyState extends State<_DashboardBody>
     const Color kElectricBlue = Color(0xFF38BDF8);
     const Color kLightBlue = Color(0xFF7DD3FC);
     const Color kCrystalLabel = Color(0xFFE2C96E);
+    final cardTextColor = isElite ? const Color(0xFF1E1300) : Colors.white;
 
     Widget coinWrap(Widget inner) {
       return AnimatedBuilder(
@@ -478,25 +500,31 @@ class _DashboardBodyState extends State<_DashboardBody>
       width: double.infinity,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(22),
-        gradient: const LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [Color(0xFF0B1120), Color(0xFF060912)],
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFFFFD700).withValues(alpha: 0.22),
-            blurRadius: 24,
-            spreadRadius: 0,
-          ),
-          BoxShadow(
-            color: const Color(0xFF3B82F6).withValues(alpha: 0.12),
-            blurRadius: 40,
-            spreadRadius: 0,
-          ),
-        ],
+        gradient: isElite
+            ? EliteOvrStyle.eliteCardGradient
+            : const LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [Color(0xFF0B1120), Color(0xFF060912)],
+              ),
+        boxShadow: isElite
+            ? EliteOvrStyle.eliteGlow(alpha: 0.5)
+            : [
+                BoxShadow(
+                  color: const Color(0xFFFFD700).withValues(alpha: 0.22),
+                  blurRadius: 24,
+                  spreadRadius: 0,
+                ),
+                BoxShadow(
+                  color: const Color(0xFF3B82F6).withValues(alpha: 0.12),
+                  blurRadius: 40,
+                  spreadRadius: 0,
+                ),
+              ],
         border: Border.all(
-          color: const Color(0xFFFFD700).withValues(alpha: 0.55),
+          color: isElite
+              ? const Color(0xFFFFE08A).withValues(alpha: 0.95)
+              : const Color(0xFFFFD700).withValues(alpha: 0.55),
           width: 1.5,
         ),
       ),
@@ -663,7 +691,7 @@ class _DashboardBodyState extends State<_DashboardBody>
                                 ? 'TEAM RANKING #${athlete.rank}'
                                 : 'YOUR RATING',
                             style: GoogleFonts.spaceGrotesk(
-                              color: kGold,
+                              color: isElite ? const Color(0xFF2E1E00) : kGold,
                               fontSize: 12,
                               fontWeight: FontWeight.w800,
                               letterSpacing: 1.2,
@@ -694,7 +722,7 @@ class _DashboardBodyState extends State<_DashboardBody>
                     'OVERALL RATING',
                     textAlign: TextAlign.center,
                     style: GoogleFonts.spaceGrotesk(
-                      color: kCrystalLabel,
+                      color: isElite ? const Color(0xFF2E1E00) : kCrystalLabel,
                       fontSize: 11,
                       fontWeight: FontWeight.w700,
                       letterSpacing: 5.0,
@@ -868,7 +896,7 @@ class _DashboardBodyState extends State<_DashboardBody>
                       Text(
                         ovrResolved ? c.phaseName : 'LOADING',
                         style: GoogleFonts.spaceGrotesk(
-                          color: Colors.white,
+                          color: cardTextColor,
                           fontSize: 13,
                           fontWeight: FontWeight.w800,
                           letterSpacing: 0.5,
@@ -1361,7 +1389,7 @@ class _DashboardBodyState extends State<_DashboardBody>
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              _buildBar('ATHLETE',   ath, athPct, AppColors.primary),
+              _buildBar('COMPETITOR',   ath, athPct, AppColors.primary),
               const SizedBox(height: 20),
               _buildBar('STUDENT',   stu, stuPct, AppColors.positive),
               const SizedBox(height: 20),
@@ -1429,85 +1457,7 @@ class _DashboardBodyState extends State<_DashboardBody>
   // Unlocked: solid color circle, white icon. Locked: grey circle, subtle border, padlock.
 
   Widget _buildAchievements(List<String> badges) {
-    final defs = _kBadgeDefs;
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(24),
-      child: Container(
-        width: double.infinity,
-        // decoration: BoxDecoration(
-        //   color: const Color(0x08FFFFFF), // #FFFFFF @ 3%
-        //   // borderRadius: BorderRadius.circular(24),
-        //   // border: Border.all(
-        //   //   color: const Color(0x1AFFFFFF), // #FFFFFF @ 10%
-        //   //   width: 1,
-        //   // ),
-        // ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
-          children: defs.asMap().entries.map((e) {
-            final bd       = e.value;
-            final unlocked = badges.contains(bd.key);
-            return _buildBadgeItem(bd, unlocked, e.key);
-          }).toList(),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildBadgeItem(_BadgeDef bd, bool unlocked, int idx) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 60,
-          height: 60,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: unlocked
-                ? bd.color
-                : const Color(0xFF3D454D), // muted grey for locked
-            border: unlocked
-                ? null
-                : Border.all(
-                    color: Colors.white.withOpacity(0.06),
-                    width: 1,
-                  ),
-            boxShadow: unlocked
-                ? [
-                    BoxShadow(
-                      color: bd.color.withOpacity(0.35),
-                      blurRadius: 12,
-                      spreadRadius: 0,
-                    ),
-                  ]
-                : null,
-          ),
-          child: Icon(
-            unlocked ? bd.icon : Icons.lock_outline_rounded,
-            color: Colors.white,
-            size: 26,
-          ),
-        )
-            .animate(delay: Duration(milliseconds: 400 + idx * 70))
-            .scale(
-                begin: const Offset(0.5, 0.5),
-                duration: 500.ms,
-                curve: Curves.elasticOut),
-        const SizedBox(height: 10),
-        Text(
-          bd.label,
-          style: GoogleFonts.spaceGrotesk(
-            color: unlocked
-                ? Colors.white.withOpacity(0.85)
-                : Colors.white.withOpacity(0.40),
-            fontSize: 11,
-            fontWeight: FontWeight.w600,
-            letterSpacing: 0.2,
-          ),
-          textAlign: TextAlign.center,
-        ),
-      ],
-    );
+    return BadgeTrophyCase(earnedBadges: badges, badgeSize: 56);
   }
 
   // ── Recent Ratings ────────────────────────────────────────────────────────────
@@ -1516,25 +1466,23 @@ class _DashboardBodyState extends State<_DashboardBody>
 
   List<_RecentRatingItem> _recentRatingItems(PlayerController c) {
     final history = c.pointHistory.take(3).toList();
-    if (history.isNotEmpty) {
-      return history.map((tx) {
-        final isPos = tx.value > 0;
-        final catDisplay = _catDisplay(tx.category);
-        final isCitizen = tx.category.toLowerCase() == 'citizen' || tx.category.toLowerCase() == 'standard';
-        return _RecentRatingItem(
-          mainText: isCitizen
-              ? 'Citizen goal achieved '
-              : 'Your coach awarded you ',
-          value: '${isPos ? '+' : ''}${tx.value}',
-          valueColor: isPos
-              ? (isCitizen ? const Color(0xFFFF9800) : const Color(0xFF00C853))
-              : AppColors.negative,
-          subtitle: '${catDisplay.toUpperCase()} • ${_relTime(tx.createdAt)}',
-          useMedalIcon: isCitizen,
-        );
-      }).toList();
-    }
-    return _kMockRecentRatings;
+    if (history.isEmpty) return const [];
+    return history.map((tx) {
+      final isPos = tx.value > 0;
+      final catDisplay = _catDisplay(tx.category);
+      final isCitizen = tx.category.toLowerCase() == 'citizen' || tx.category.toLowerCase() == 'standard';
+      return _RecentRatingItem(
+        mainText: isCitizen
+            ? 'Citizen goal achieved '
+            : 'Your coach awarded you ',
+        value: '${isPos ? '+' : ''}${tx.value}',
+        valueColor: isPos
+            ? (isCitizen ? const Color(0xFFFF9800) : const Color(0xFF00C853))
+            : AppColors.negative,
+        subtitle: '${catDisplay.toUpperCase()} • ${_relTime(tx.createdAt)}',
+        useMedalIcon: isCitizen,
+      );
+    }).toList();
   }
 
   // Figma: radius=16, padding=12, gap=12, fill=#FFFFFF@3%, border=1px #FFFFFF@10%, blur=12
@@ -1630,7 +1578,8 @@ class _DashboardBodyState extends State<_DashboardBody>
   String _catDisplay(String cat) {
     switch (cat.toLowerCase()) {
       case 'athlete':
-      case 'performance': return 'Athlete';
+      case 'competitor':
+      case 'performance': return 'Competitor';
       case 'student':
       case 'class':
       case 'classroom':   return 'Student';
@@ -1714,40 +1663,4 @@ class _RecentRatingItem {
   });
 }
 
-const _kMockRecentRatings = [
-  _RecentRatingItem(
-    mainText: 'Coach Smith awarded you ',
-    value: '+3',
-    valueColor: Color(0xFF00C853),
-    subtitle: 'ATHLETE • 2H AGO',
-    useMedalIcon: false,
-  ),
-  _RecentRatingItem(
-    mainText: 'Citizen goal achieved ',
-    value: '+5',
-    valueColor: Color(0xFFFF9800),
-    subtitle: 'CITIZEN • YESTERDAY',
-    useMedalIcon: true,
-  ),
-];
 
-// ── Badge definitions ─────────────────────────────────────────────────────────
-
-class _BadgeDef {
-  final String key, label;
-  final IconData icon;
-  final Color color;
-  const _BadgeDef({
-    required this.key,
-    required this.label,
-    required this.icon,
-    required this.color,
-  });
-}
-
-const _kBadgeDefs = [
-  _BadgeDef(key: 'rising_star', label: 'Rising Star',  icon: Icons.star_outline_rounded, color: Color(0xFFF2A60D)),
-  _BadgeDef(key: 'team_player', label: 'Team Player',  icon: Icons.handshake_rounded,   color: AppColors.positive),
-  _BadgeDef(key: 'mvp',         label: 'MVP',          icon: Icons.military_tech_rounded, color: AppColors.primary),
-  _BadgeDef(key: 'iron_man',    label: 'Iron Man',     icon: Icons.shield_rounded,      color: Color(0xFF9B30FF)),
-];

@@ -10,6 +10,7 @@ class GlassCard extends StatelessWidget {
   final EdgeInsetsGeometry padding;
   final double borderRadius;
   final Color? backgroundColor;
+  final Gradient? gradient;
   final Color? leftBorderColor;
   final Color? borderColor;   // full all-sides border override
   final Color? glowColor;     // custom shadow color
@@ -22,6 +23,7 @@ class GlassCard extends StatelessWidget {
     this.padding = const EdgeInsets.all(16.0),
     this.borderRadius = 16.0,
     this.backgroundColor,
+    this.gradient,
     this.leftBorderColor,
     this.borderColor,
     this.glowColor,
@@ -38,7 +40,8 @@ class GlassCard extends StatelessWidget {
           child: Container(
             clipBehavior: leftBorderColor != null ? Clip.hardEdge : Clip.none,
             decoration: BoxDecoration(
-              color: backgroundColor ?? AppColors.cardSurface,
+              color: backgroundColor ?? (gradient == null ? AppColors.cardSurface : null),
+              gradient: gradient,
               borderRadius: BorderRadius.circular(borderRadius),
               border: Border.all(
                 color: borderColor ?? AppColors.cardBorder,

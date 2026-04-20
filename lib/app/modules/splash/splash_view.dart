@@ -5,7 +5,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 
 import '../../core/constants/app_assets.dart';
 import '../../core/constants/app_colors.dart';
-import '../../core/widgets/fire_sparks_background.dart';
+import '../../core/widgets/app_logo.dart';
 import 'splash_controller.dart';
 
 class SplashView extends StatefulWidget {
@@ -89,7 +89,7 @@ class _SplashViewState extends State<SplashView>
                 // ── Logo (Drops from top using flutter_animate) ──
                 Hero(
                   tag: 'app_logo',
-                  child: Image.asset(AppAssets.logo, width: 176),
+                  child: const AppLogo(width: 176),
                 )
                     .animate()
                     .fade(duration: 1200.ms, curve: Curves.easeOutQuint)

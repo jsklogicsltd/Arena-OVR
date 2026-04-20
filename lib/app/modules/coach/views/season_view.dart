@@ -8,7 +8,6 @@ import 'package:intl/intl.dart';
 import '../coach_controller.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/widgets/stadium_background.dart';
-import '../../../core/widgets/fire_sparks_background.dart';
 
 class SeasonView extends StatefulWidget {
   const SeasonView({super.key});
@@ -19,6 +18,9 @@ class SeasonView extends StatefulWidget {
 
 class _SeasonViewState extends State<SeasonView> with TickerProviderStateMixin {
   late final CoachController controller;
+  late final TextEditingController _seasonLengthCtrl;
+  late final TextEditingController _startingBaselineCtrl;
+  bool _isSavingSettings = false;
 
   // Animation controllers
   late AnimationController _progressCtrl;
@@ -36,6 +38,11 @@ class _SeasonViewState extends State<SeasonView> with TickerProviderStateMixin {
 
     _progressCtrl = AnimationController(duration: const Duration(milliseconds: 1400), vsync: this);
     _statsCtrl    = AnimationController(duration: const Duration(milliseconds: 1600), vsync: this);
+    _seasonLengthCtrl = TextEditingController();
+    _startingBaselineCtrl = TextEditingController();
+    final t = controller.currentTeam.value;
+    _seasonLengthCtrl.text = '${t?.seasonLengthDays ?? 15}';
+    _startingBaselineCtrl.text = '${t?.startingOvrBaseline ?? 50}';
 
     // Compute real values for animation targets
     final progress = _computeProgress();
@@ -96,12 +103,19 @@ class _SeasonViewState extends State<SeasonView> with TickerProviderStateMixin {
         if (mounted) _statsCtrl.forward();
       });
     });
+    ever(controller.currentTeam, (team) {
+      if (!mounted || team == null) return;
+      _seasonLengthCtrl.text = '${team.seasonLengthDays}';
+      _startingBaselineCtrl.text = '${team.startingOvrBaseline}';
+    });
   }
 
   @override
   void dispose() {
     _progressCtrl.dispose();
     _statsCtrl.dispose();
+    _seasonLengthCtrl.dispose();
+    _startingBaselineCtrl.dispose();
     super.dispose();
   }
 
@@ -136,7 +150,9 @@ class _SeasonViewState extends State<SeasonView> with TickerProviderStateMixin {
 
   int _totalDays() {
     final s = controller.season.value;
-    if (s?.startDate == null || s?.endDate == null) return 15;
+    if (s?.startDate == null || s?.endDate == null) {
+      return controller.currentTeam.value?.seasonLengthDays ?? 15;
+    }
     // Inclusive day count: end-start(14) means 15 season days.
     return max(1, s!.endDate!.difference(s.startDate!).inDays + 1);
   }
@@ -144,6 +160,82 @@ class _SeasonViewState extends State<SeasonView> with TickerProviderStateMixin {
   String _formatDate(DateTime? dt) {
     if (dt == null) return '–';
     return DateFormat('MMM d, yyyy').format(dt);
+  }
+
+  Future<void> _saveSeasonSettings() async {
+    final seasonLen = int.tryParse(_seasonLengthCtrl.text.trim());
+    final baseline = int.tryParse(_startingBaselineCtrl.text.trim());
+    if (seasonLen == null || seasonLen < 7) {
+      Get.snackbar('Invalid Season Length', 'Season length must be at least 7 days.');
+      return;
+    }
+    if (baseline == null || baseline < 0 || baseline > 90) {
+      Get.snackbar('Invalid Starting OVR', 'Starting OVR baseline must be between 0 and 90.');
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1A1A2E),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          'Warning: Reset Season?',
+          style: GoogleFonts.orbitron(
+            color: Colors.amber,
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        content: Text(
+          'Changing the Season Length or Starting OVR will completely '
+          'reset the current season. All players\u2019 current OVRs will '
+          'be reset to the new Starting OVR, and all progress will be '
+          'lost.\n\nDo you want to proceed?',
+          style: const TextStyle(color: Colors.white70, height: 1.45),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text('Cancel',
+                style: GoogleFonts.rajdhani(
+                    color: Colors.white54, fontWeight: FontWeight.w600)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red.shade700,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text('Reset Season',
+                style: GoogleFonts.rajdhani(
+                    color: Colors.white, fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    setState(() => _isSavingSettings = true);
+    try {
+      await controller.resetSeasonWithNewSettings(
+        seasonLengthDays: seasonLen,
+        startingOvrBaseline: baseline,
+      );
+      Get.snackbar(
+        'Season Reset',
+        'Season and player OVRs have been successfully reset.',
+        backgroundColor: AppColors.tierGold,
+        colorText: Colors.black,
+      );
+    } catch (e) {
+      Get.snackbar('Error', 'Failed to reset season: $e');
+    } finally {
+      if (mounted) setState(() => _isSavingSettings = false);
+    }
   }
 
   // ── build ──────────────────────────────────────────────────────────────────
@@ -349,6 +441,110 @@ class _SeasonViewState extends State<SeasonView> with TickerProviderStateMixin {
 
                 const SizedBox(height: 32),
 
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(20),
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.06),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: Colors.white.withOpacity(0.1), width: 1),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'TEAM OVR SETTINGS',
+                            style: GoogleFonts.spaceGrotesk(
+                              color: Colors.white,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 1.2,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: TextField(
+                                  controller: _seasonLengthCtrl,
+                                  keyboardType: TextInputType.number,
+                                  style: GoogleFonts.inter(color: Colors.white),
+                                  decoration: InputDecoration(
+                                    labelText: 'Season Length (days)',
+                                    labelStyle: GoogleFonts.inter(color: Colors.white54),
+                                    hintText: 'Min 7',
+                                    hintStyle: GoogleFonts.inter(color: Colors.white30),
+                                    filled: true,
+                                    fillColor: Colors.black.withOpacity(0.2),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                      borderSide: BorderSide(color: Colors.white.withOpacity(0.12)),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: TextField(
+                                  controller: _startingBaselineCtrl,
+                                  keyboardType: TextInputType.number,
+                                  style: GoogleFonts.inter(color: Colors.white),
+                                  decoration: InputDecoration(
+                                    labelText: 'Starting OVR',
+                                    labelStyle: GoogleFonts.inter(color: Colors.white54),
+                                    hintText: '0 - 90',
+                                    hintStyle: GoogleFonts.inter(color: Colors.white30),
+                                    filled: true,
+                                    fillColor: Colors.black.withOpacity(0.2),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                      borderSide: BorderSide(color: Colors.white.withOpacity(0.12)),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton(
+                              onPressed: _isSavingSettings ? null : _saveSeasonSettings,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.primary,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                              child: _isSavingSettings
+                                  ? const SizedBox(
+                                      width: 18,
+                                      height: 18,
+                                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                    )
+                                  : Text(
+                                      'SAVE TEAM SETTINGS',
+                                      style: GoogleFonts.spaceGrotesk(
+                                        color: Colors.white,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w700,
+                                        letterSpacing: 0.8,
+                                      ),
+                                    ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ).animate(delay: 80.ms).fade().slideY(begin: 0.08),
+
+                const SizedBox(height: 24),
+
                 // ── 2. Reset Season Danger Button ─────────────────────────
                 _buildResetButton(context).animate(delay: 100.ms).fade().slideY(begin: 0.1),
                 const SizedBox(height: 8),
@@ -356,7 +552,7 @@ class _SeasonViewState extends State<SeasonView> with TickerProviderStateMixin {
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16.0),
                     child: Text(
-                      'All player ratings will reset to 0. A new 3-day reveal period begins.',
+                      'All player ratings reset to this team\'s Starting OVR baseline.',
                       textAlign: TextAlign.center,
                       style: GoogleFonts.inter(
                           color: const Color(0xFFEF4444),

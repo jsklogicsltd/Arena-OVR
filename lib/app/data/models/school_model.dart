@@ -11,6 +11,8 @@ class SchoolModel {
   final int coachCount;
   final DateTime? createdAt;
   final String? logoUrl;
+  final int maxTeamsLimit;
+  final int maxAthletesLimit;
 
   SchoolModel({
     required this.id,
@@ -23,6 +25,8 @@ class SchoolModel {
     this.coachCount = 0,
     this.createdAt,
     this.logoUrl,
+    this.maxTeamsLimit = 3,
+    this.maxAthletesLimit = 60,
   });
 
   SchoolModel copyWith({
@@ -36,6 +40,8 @@ class SchoolModel {
     int? coachCount,
     DateTime? createdAt,
     String? logoUrl,
+    int? maxTeamsLimit,
+    int? maxAthletesLimit,
   }) {
     return SchoolModel(
       id: id ?? this.id,
@@ -48,6 +54,8 @@ class SchoolModel {
       coachCount: coachCount ?? this.coachCount,
       createdAt: createdAt ?? this.createdAt,
       logoUrl: logoUrl ?? this.logoUrl,
+      maxTeamsLimit: maxTeamsLimit ?? this.maxTeamsLimit,
+      maxAthletesLimit: maxAthletesLimit ?? this.maxAthletesLimit,
     );
   }
 
@@ -63,6 +71,8 @@ class SchoolModel {
       coachCount: json['coachCount'] ?? 0,
       createdAt: json['createdAt'] != null ? (json['createdAt'] as Timestamp).toDate() : null,
       logoUrl: json['logoUrl'],
+      maxTeamsLimit: (json['maxTeamsLimit'] as num?)?.toInt() ?? 3,
+      maxAthletesLimit: (json['maxAthletesLimit'] as num?)?.toInt() ?? 60,
     );
   }
 
@@ -78,6 +88,8 @@ class SchoolModel {
       'coachCount': coachCount,
       'createdAt': createdAt != null ? Timestamp.fromDate(createdAt!) : null,
       'logoUrl': logoUrl,
+      'maxTeamsLimit': maxTeamsLimit,
+      'maxAthletesLimit': maxAthletesLimit,
     };
   }
 }

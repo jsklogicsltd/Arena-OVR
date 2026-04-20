@@ -8,6 +8,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../../core/widgets/stadium_background.dart';
 import '../../core/widgets/glass_card.dart';
 import '../../core/components/animated_glowing_border.dart';
+import '../../core/utils/change_password_helper.dart';
 import 'admin_controller.dart';
 
 class AdminSettingsView extends GetView<AdminController> {
@@ -387,6 +388,7 @@ class AdminSettingsView extends GetView<AdminController> {
                             _buildListTile(
                               Icons.lock_outline,
                               'Change Password',
+                              onTap: () => ChangePasswordHelper.show(context),
                             ),
                             Divider(
                               color: Colors.white.withValues(alpha: 0.1),

@@ -36,11 +36,10 @@ class _AnimatedGlowingBorderState extends State<AnimatedGlowingBorder>
   late final AnimationController _controller;
 
   static const List<Color> _sweepColors = [
-    // Brand sweep: Navy -> Silver -> Gold -> Navy (loop)
-    Color(0xFF000080), // Navy Blue
+    // Brand sweep: Silver -> Gold -> Silver (loop)
     Color(0xFFC0C0C0), // Silver/Grey
     Color(0xFFFFD700), // Gold
-    Color(0xFF000080), // back to Navy for seamless loop
+    Color(0xFFC0C0C0), // back to Silver for seamless loop
   ];
 
   @override
@@ -84,7 +83,7 @@ class _AnimatedGlowingBorderState extends State<AnimatedGlowingBorder>
                 shape: BoxShape.circle,
                 boxShadow: [
                   BoxShadow(
-                    color: const Color(0xFF000080).withValues(alpha: 0.32),
+                    color: const Color(0xFFC0C0C0).withValues(alpha: 0.22),
                     blurRadius: widget.glowBlur,
                     spreadRadius: widget.glowSpread,
                   ),
@@ -111,7 +110,7 @@ class _AnimatedGlowingBorderState extends State<AnimatedGlowingBorder>
                       shape: BoxShape.circle,
                       gradient: SweepGradient(
                         colors: _sweepColors,
-                        stops: const [0.0, 0.36, 0.72, 1.0],
+                        stops: const [0.0, 0.5, 1.0],
                         tileMode: TileMode.clamp,
                       ),
                     ),

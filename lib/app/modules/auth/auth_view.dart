@@ -2,12 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import '../../core/constants/app_assets.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/widgets/app_logo.dart';
 import '../../core/widgets/glass_card.dart';
 import '../../core/widgets/glass_text_field.dart';
 import '../../core/widgets/arena_button.dart';
-import '../../core/widgets/fire_sparks_background.dart';
+// import '../../core/widgets/fire_sparks_background.dart';
 import '../../routes/app_routes.dart';
 import 'auth_controller.dart';
 
@@ -76,6 +76,9 @@ class AuthView extends GetView<AuthController> {
                       controller: controller.emailController,
                       hintText: 'Email',
                       prefixIcon: Icons.email_outlined,
+                      keyboardType: TextInputType.emailAddress,
+                      textInputAction: TextInputAction.next,
+                      autofillHints: const [AutofillHints.email],
                     )
                     .animate(delay: 440.ms)
                     .fade(duration: 400.ms)
@@ -89,6 +92,11 @@ class AuthView extends GetView<AuthController> {
                       hintText: 'Password',
                       prefixIcon: Icons.lock_outline,
                       isPassword: true,
+                      keyboardType: TextInputType.visiblePassword,
+                      textInputAction: TextInputAction.done,
+                      autofillHints: const [AutofillHints.password],
+                      enableSuggestions: false,
+                      autocorrect: false,
                     )
                     .animate(delay: 510.ms)
                     .fade(duration: 400.ms)
@@ -225,15 +233,7 @@ class AuthView extends GetView<AuthController> {
     return Column(
       children: [
         // Logo image with dramatic reveal
-        Image.asset(
-          AppAssets.logo,
-          width: 115,
-          errorBuilder: (_, __, ___) => const Icon(
-            Icons.sports_football,
-            color: AppColors.tierGold,
-            size: 72,
-          ),
-        )
+        const AppLogo(width: 115)
         .animate()
         .blur(begin: const Offset(16, 16), end: Offset.zero, duration: 600.ms, curve: Curves.easeOut)
         .fade(duration: 350.ms, curve: Curves.easeIn)

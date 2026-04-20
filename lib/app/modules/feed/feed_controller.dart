@@ -27,9 +27,11 @@ class FeedController extends GetxController {
     _subscribeToFeed();
     try {
       ever(Get.find<PlayerController>().athlete, (_) => _subscribeToFeed());
+      ever(Get.find<PlayerController>().season, (_) => _subscribeToFeed());
     } catch (_) {}
     try {
       ever(Get.find<CoachController>().currentTeam, (_) => _subscribeToFeed());
+      ever(Get.find<CoachController>().season, (_) => _subscribeToFeed());
     } catch (_) {}
   }
 
@@ -52,8 +54,21 @@ class FeedController extends GetxController {
     return null;
   }
 
+  DateTime? get _seasonStart {
+    try {
+      final s = Get.find<PlayerController>().season.value?.startDate;
+      if (s != null) return s;
+    } catch (_) {}
+    try {
+      final s = Get.find<CoachController>().season.value?.startDate;
+      if (s != null) return s;
+    } catch (_) {}
+    return null;
+  }
+
   void _subscribeToFeed() {
     final teamId = _teamId;
+    final seasonStart = _seasonStart;
     if (teamId == null || teamId.isEmpty) {
       pinnedItem.value = null;
       feed.clear();
@@ -66,10 +81,17 @@ class FeedController extends GetxController {
     _pinnedSub?.cancel();
     _feedSub?.cancel();
 
-    _pinnedSub = _firestore
+    Query<Map<String, dynamic>> pinnedQ = _firestore
         .collection('feed')
         .where('teamId', isEqualTo: teamId)
-        .where('isPinned', isEqualTo: true)
+        .where('isPinned', isEqualTo: true);
+    if (seasonStart != null) {
+      pinnedQ = pinnedQ.where(
+        'createdAt',
+        isGreaterThanOrEqualTo: Timestamp.fromDate(seasonStart),
+      );
+    }
+    _pinnedSub = pinnedQ
         .orderBy('createdAt', descending: true)
         .limit(1)
         .snapshots()
@@ -84,10 +106,17 @@ class FeedController extends GetxController {
       pinnedItem.value = FeedModel.fromJson(data);
     });
 
-    _feedSub = _firestore
+    Query<Map<String, dynamic>> feedQ = _firestore
         .collection('feed')
         .where('teamId', isEqualTo: teamId)
-        .where('isPinned', isEqualTo: false)
+        .where('isPinned', isEqualTo: false);
+    if (seasonStart != null) {
+      feedQ = feedQ.where(
+        'createdAt',
+        isGreaterThanOrEqualTo: Timestamp.fromDate(seasonStart),
+      );
+    }
+    _feedSub = feedQ
         .orderBy('createdAt', descending: true)
         .limit(pageSize)
         .snapshots()
@@ -108,14 +137,22 @@ class FeedController extends GetxController {
   /// Load next [pageSize] items. Call when user scrolls near bottom.
   Future<void> loadMore() async {
     final teamId = _teamId;
+    final seasonStart = _seasonStart;
     if (teamId == null || _lastDoc == null || isLoadingMore.value || !hasMore.value) return;
 
     isLoadingMore.value = true;
     try {
-      final snap = await _firestore
+      Query<Map<String, dynamic>> pageQ = _firestore
           .collection('feed')
           .where('teamId', isEqualTo: teamId)
-          .where('isPinned', isEqualTo: false)
+          .where('isPinned', isEqualTo: false);
+      if (seasonStart != null) {
+        pageQ = pageQ.where(
+          'createdAt',
+          isGreaterThanOrEqualTo: Timestamp.fromDate(seasonStart),
+        );
+      }
+      final snap = await pageQ
           .orderBy('createdAt', descending: true)
           .startAfterDocument(_lastDoc!)
           .limit(pageSize)

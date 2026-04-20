@@ -13,7 +13,7 @@ import '../../data/models/team_model.dart';
 import '../../data/models/season_model.dart';
 import '../../data/models/transaction_model.dart';
 import '../../data/repositories/rating_repository.dart';
-import '../../core/services/ovr_engine_service.dart';
+import '../../core/services/ovr_engine_service.dart' show SeasonOvrUi;
 import '../../scoring_engine/profile_assignment.dart';
 import '../leaderboard/leaderboard_controller.dart';
 import '../feed/feed_controller.dart';
@@ -22,7 +22,6 @@ import '../settings/settings_controller.dart';
 class PlayerController extends GetxController {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final RatingRepository _ratingRepo = RatingRepository();
-  final OvrEngineService _ovrEngine = OvrEngineService();
 
   // ── Observables ───────────────────────────────────────────────────────────────
   final Rx<UserModel?> athlete     = Rx<UserModel?>(null);
@@ -48,14 +47,18 @@ class PlayerController extends GetxController {
 
   int get _daysElapsed {
     final start = season.value?.startDate;
+    final seasonLengthDays =
+        (season.value?.seasonLengthDays ?? team.value?.seasonLengthDays ?? 15)
+            .clamp(7, 365);
     if (start == null) {
       final storedDay = athlete.value?.ovrDay;
-      if (storedDay != null) return storedDay.clamp(1, 15);
+      if (storedDay != null) return storedDay.clamp(1, seasonLengthDays);
       return 1;
     }
-    return _ovrEngine.calculateSeasonDay(
+    return SeasonOvrUi.calculateSeasonDay(
       seasonStartDate: start,
       currentDate: DateTime.now(),
+      seasonLengthDays: seasonLengthDays,
     );
   }
 
@@ -82,37 +85,66 @@ class PlayerController extends GetxController {
     return isOvrTimingReady;
   }
 
+  int get revealDays {
+    final total =
+        (season.value?.seasonLengthDays ?? team.value?.seasonLengthDays ?? 15)
+            .clamp(7, 365);
+    // Client rule:
+    // - Season <= 14 days: reveal after 1 day (Day 1 locked)
+    // - Season >= 15 days: reveal after 2 days (Days 1-2 locked)
+    return (total <= 14) ? 1 : 2;
+  }
+
   int? get displayedOvr {
     final a = athlete.value;
     if (a == null) return null;
     final raw = a.finalOvr;
-    if (_daysElapsed <= 1) return null; // Day 1 locked
+    if (_daysElapsed <= revealDays) return null; // locked window
     return math.min(raw, currentPhaseCap);
   }
 
-  // New rule: Day 1 hidden, Day 2+ revealed.
+  // Reveal window is dynamic based on season length (see [revealDays]).
   bool get isOvrRevealed => displayedOvr != null;
-  // Full unlock starts at day 9 (cap becomes 99).
-  bool get isUnlocked => _daysElapsed >= 9;
+  // Full unlock starts when the athlete reaches phase 3.
+  bool get isUnlocked {
+    final total = (season.value?.seasonLengthDays ?? team.value?.seasonLengthDays ?? 15)
+        .clamp(7, 365);
+    final phase2EndDay = ((total * 2.0) / 3.0).ceil();
+    return _daysElapsed > phase2EndDay;
+  }
 
   int get currentPhaseCap {
     if (season.value?.startDate == null && athlete.value?.ovrCap != null) {
       return athlete.value!.ovrCap!.clamp(0, 99);
     }
-    return _ovrEngine.capForDay(_daysElapsed);
+    final total = (season.value?.seasonLengthDays ?? team.value?.seasonLengthDays ?? 15)
+        .clamp(7, 365);
+    final baseline =
+        (season.value?.startingOvrBaseline ?? team.value?.startingOvrBaseline ?? 50)
+            .clamp(0, 90);
+    return SeasonOvrUi.phaseCapForDay(
+      day: _daysElapsed,
+      seasonLengthDays: total,
+      startingOvrBaseline: baseline,
+    );
   }
 
   String get capStatusLabel {
     final d = _daysElapsed;
-    if (d == 1) return 'DAY 1 LOCKED';
-    if (d >= 9) return 'FULLY UNLOCKED';
+    if (d <= revealDays) return 'DAY $d LOCKED';
+    if (isUnlocked) return 'FULLY UNLOCKED';
     return 'CURRENT CAP: $currentPhaseCap OVR';
   }
 
   String get phaseName {
     final d = _daysElapsed;
-    if (d == 1) return 'DAY 1';
-    if (d <= 8) return 'DAY $d';
+    final total = (season.value?.seasonLengthDays ?? team.value?.seasonLengthDays ?? 15)
+        .clamp(7, 365);
+    final phase1EndDay = (total / 3.0).ceil();
+    final phase2EndDay = ((total * 2.0) / 3.0).ceil();
+    if (d <= revealDays) return 'DAY $d';
+    if (d <= phase1EndDay) return 'PHASE 1 · DAY $d';
+    if (d <= phase2EndDay) return 'PHASE 2 · DAY $d';
     return 'UNLOCKED';
   }
 
@@ -128,7 +160,7 @@ class PlayerController extends GetxController {
     if (streak.isEmpty) return '';
     int maxVal = 0;
     String bestKey = '';
-    for (final key in ['Athlete', 'Student', 'Teammate', 'Citizen',
+    for (final key in ['Athlete', 'Competitor', 'Student', 'Teammate', 'Citizen',
                         'Performance', 'Class', 'Program', 'Standard']) {
       final v = streak[key];
       if (v is int && v > maxVal) {
@@ -143,7 +175,8 @@ class PlayerController extends GetxController {
   String _catLabel(String cat) {
     switch (cat.toLowerCase()) {
       case 'athlete':
-      case 'performance': return 'Athlete';
+      case 'competitor':
+      case 'performance': return 'Competitor';
       case 'student':
       case 'class':
       case 'classroom':   return 'Student';
@@ -251,13 +284,20 @@ class PlayerController extends GetxController {
         final data = doc.data()!;
         data['id'] = doc.id;
         season.value = SeasonModel.fromJson(data);
+        final uid = athlete.value?.uid;
+        if (uid != null && uid.isNotEmpty) {
+          _loadPointHistory(uid, seasonId: season.value?.id);
+        }
       }
     });
   }
 
-  Future<void> _loadPointHistory(String uid) async {
+  Future<void> _loadPointHistory(String uid, {String? seasonId}) async {
     try {
-      pointHistory.value = await _ratingRepo.getAthleteHistory(uid);
+      pointHistory.value = await _ratingRepo.getAthleteHistory(
+        uid,
+        seasonId: seasonId,
+      );
     } catch (_) {
       if (isUsingMockData.value) pointHistory.value = _mockHistory;
     }
@@ -301,6 +341,8 @@ class PlayerController extends GetxController {
       isActive: true,
       primaryColor: '#00A3FF',
       secondaryColor: '#FFB800',
+      seasonLengthDays: 15,
+      startingOvrBaseline: 50,
       createdBy: 'mock_coach',
     );
     coachName.value = 'Coach Smith';
@@ -310,6 +352,8 @@ class PlayerController extends GetxController {
       schoolId: 'mock',
       seasonNumber: 1,
       startDate: DateTime.now().subtract(const Duration(days: 6)),
+      seasonLengthDays: 15,
+      startingOvrBaseline: 50,
       isActive: true,
     );
     pointHistory.value = _mockHistory;
@@ -460,8 +504,8 @@ class PlayerController extends GetxController {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return;
 
-    if (grade < 9 || grade > 12) {
-      Get.snackbar('Error', 'Grade must be 9–12',
+    if (grade < 7 || grade > 12) {
+      Get.snackbar('Error', 'Grade must be 7–12',
         snackPosition: SnackPosition.BOTTOM,
         backgroundColor: Colors.red.withValues(alpha: 0.85),
         colorText: Colors.white);
@@ -478,8 +522,10 @@ class PlayerController extends GetxController {
     try {
       isSavingPhysical.value = true;
 
-      final power = assignPowerProfile(heightInches, weightLbs);
-      final speed = assignSpeedProfile(heightInches, weightLbs);
+      final power =
+          assignPowerProfile(heightInches, weightLbs, grade: grade);
+      final speed =
+          assignSpeedProfile(heightInches, weightLbs, grade: grade);
 
       final data = <String, dynamic>{
         'grade': grade,

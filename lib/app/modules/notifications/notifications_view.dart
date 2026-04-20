@@ -35,8 +35,8 @@ class NotificationsView extends GetView<NotificationsController> {
                             controller.filterIndex.value == 1
                                 ? 'No unread notifications'
                                 : controller.filterIndex.value == 2
-                                    ? 'No archived items'
-                                    : 'No notifications yet',
+                                ? 'No archived items'
+                                : 'No notifications yet',
                             style: GoogleFonts.inter(
                               color: Colors.white54,
                               fontSize: 14,
@@ -73,8 +73,11 @@ class NotificationsView extends GetView<NotificationsController> {
         children: [
           IconButton(
             onPressed: () => Navigator.pop(context),
-            icon: const Icon(Icons.arrow_back_ios_new_rounded,
-                color: Colors.white, size: 22),
+            icon: const Icon(
+              Icons.arrow_back_ios_new_rounded,
+              color: Colors.white,
+              size: 22,
+            ),
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
           ),
@@ -86,10 +89,14 @@ class NotificationsView extends GetView<NotificationsController> {
                 Stack(
                   clipBehavior: Clip.none,
                   children: [
-                    const Icon(Icons.notifications_none_rounded,
-                        color: Colors.white70, size: 24),
+                    const Icon(
+                      Icons.notifications_none_rounded,
+                      color: Colors.white70,
+                      size: 24,
+                    ),
                     Obx(() {
-                      if (controller.unreadCount == 0) return const SizedBox.shrink();
+                      if (controller.unreadCount == 0)
+                        return const SizedBox.shrink();
                       return Positioned(
                         right: -2,
                         top: -2,
@@ -207,11 +214,7 @@ class _NotificationCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: const Color(0x05FFFFFF),
           borderRadius: BorderRadius.circular(24),
-          border: Border.all(
-            color: Colors.white.withOpacity(0.08),
-            width: 1,
-          ),
-
+          border: Border.all(color: Colors.white.withOpacity(0.08), width: 1),
         ),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(24),
@@ -236,81 +239,86 @@ class _NotificationCard extends StatelessWidget {
                     child: Padding(
                       padding: const EdgeInsets.all(12),
                       child: Row(
-                      children: [
-                        Container(
-                          width: 44,
-                          height: 44,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: iconBg,
+                        children: [
+                          Container(
+                            width: 44,
+                            height: 44,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: iconBg,
+                            ),
+                            child: Icon(
+                              iconData,
+                              color: Colors.white,
+                              size: 22,
+                            ),
                           ),
-                          child: Icon(iconData, color: Colors.white, size: 22),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(
+                                  item.title,
+                                  style: GoogleFonts.spaceGrotesk(
+                                    color: Colors.white,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  item.body,
+                                  style: GoogleFonts.inter(
+                                    color: Colors.white70,
+                                    fontSize: 12,
+                                    height: 1.3,
+                                  ),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Column(
                             mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.end,
                             children: [
                               Text(
-                                item.title,
-                                style: GoogleFonts.spaceGrotesk(
-                                  color: Colors.white,
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                item.body,
+                                _timeAgo(item.createdAt),
                                 style: GoogleFonts.inter(
-                                  color: Colors.white70,
-                                  fontSize: 12,
-                                  height: 1.3,
+                                  color: Colors.white54,
+                                  fontSize: 11,
                                 ),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
                               ),
+                              if (isUnread) ...[
+                                const SizedBox(height: 6),
+                                Container(
+                                  width: 8,
+                                  height: 8,
+                                  decoration: const BoxDecoration(
+                                    color: Color(0xFF00A1FF),
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                              ],
                             ],
                           ),
-                        ),
-                        const SizedBox(width: 8),
-                        Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            Text(
-                              _timeAgo(item.createdAt),
-                              style: GoogleFonts.inter(
-                                color: Colors.white54,
-                                fontSize: 11,
-                              ),
-                            ),
-                            if (isUnread) ...[
-                              const SizedBox(height: 6),
-                              Container(
-                                width: 8,
-                                height: 8,
-                                decoration: const BoxDecoration(
-                                  color: Color(0xFF00A1FF),
-                                  shape: BoxShape.circle,
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
       ),
-    ));
+    );
   }
 
   static IconData _iconForType(String type) {
@@ -362,7 +370,8 @@ class _NotificationCard extends StatelessWidget {
     if (date == null) return '';
     final diff = DateTime.now().difference(date);
     if (diff.inMinutes < 60) return '${diff.inMinutes} min ago';
-    if (diff.inHours < 24) return '${diff.inHours} hour${diff.inHours == 1 ? '' : 's'} ago';
+    if (diff.inHours < 24)
+      return '${diff.inHours} hour${diff.inHours == 1 ? '' : 's'} ago';
     if (diff.inDays == 1) return 'Yesterday';
     if (diff.inDays < 7) return '${diff.inDays} days ago';
     return DateFormat('MMM d').format(date);

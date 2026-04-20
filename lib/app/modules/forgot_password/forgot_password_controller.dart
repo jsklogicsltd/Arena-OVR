@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import '../../core/utils/firebase_auth_messages.dart';
 import '../../data/repositories/auth_repository.dart';
 
 class ForgotPasswordController extends GetxController {
@@ -25,11 +27,22 @@ class ForgotPasswordController extends GetxController {
           backgroundColor: Colors.green.withOpacity(0.8),
           colorText: Colors.white);
       Get.back(); // Navigate back on success
-    } catch (e) {
-      Get.snackbar('Error', e.toString(),
-          snackPosition: SnackPosition.BOTTOM,
-          backgroundColor: Colors.red.withOpacity(0.8),
-          colorText: Colors.white);
+    } on FirebaseAuthException catch (e) {
+      Get.snackbar(
+        'Error',
+        firebaseAuthUserMessage(e),
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.red.withOpacity(0.8),
+        colorText: Colors.white,
+      );
+    } catch (_) {
+      Get.snackbar(
+        'Error',
+        'An unexpected error occurred. Please try again later.',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.red.withOpacity(0.8),
+        colorText: Colors.white,
+      );
     } finally {
       isLoading.value = false;
     }

@@ -174,6 +174,44 @@ class _CreateSchoolViewState extends State<CreateSchoolView> {
                             const SizedBox(height: 32),
 
                             Text(
+                              'SUBSCRIPTION LIMITS',
+                              style: GoogleFonts.spaceGrotesk(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white54,
+                                letterSpacing: 1.5,
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _buildLimitField(
+                                    label: 'Max Teams',
+                                    icon: Icons.groups_outlined,
+                                    controller: controller.maxTeamsController,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: _buildLimitField(
+                                    label: 'Max Athletes',
+                                    icon: Icons.directions_run_rounded,
+                                    controller: controller.maxAthletesController,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 24),
+
+                            Divider(
+                              color: Colors.white.withValues(alpha: 0.1),
+                              height: 1,
+                            ),
+                            const SizedBox(height: 24),
+
+                            Text(
                               'SUBSCRIPTION',
                               style: GoogleFonts.spaceGrotesk(
                                 fontSize: 12,
@@ -443,6 +481,66 @@ class _CreateSchoolViewState extends State<CreateSchoolView> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildLimitField({
+    required String label,
+    required IconData icon,
+    required TextEditingController controller,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(icon, color: const Color(0xFF00A1FF), size: 14),
+            const SizedBox(width: 6),
+            Text(
+              label.toUpperCase(),
+              style: GoogleFonts.spaceGrotesk(
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+                color: Colors.white54,
+                letterSpacing: 0.8,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.05),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: Colors.white.withValues(alpha: 0.1),
+            ),
+          ),
+          child: TextField(
+            controller: controller,
+            keyboardType: TextInputType.number,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            textAlign: TextAlign.center,
+            style: GoogleFonts.spaceGrotesk(
+              color: Colors.white,
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+            ),
+            decoration: InputDecoration(
+              border: InputBorder.none,
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 14,
+              ),
+              hintText: '0',
+              hintStyle: GoogleFonts.spaceGrotesk(
+                color: Colors.white24,
+                fontSize: 18,
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

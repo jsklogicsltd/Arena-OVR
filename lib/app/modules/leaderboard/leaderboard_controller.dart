@@ -28,7 +28,7 @@ class LeaderboardController extends GetxController {
   int get totalPoints {
     return ranked.fold<int>(0, (sum, u) {
       final r = u.currentRating;
-      final a = ((r['Athlete'] ?? r['Performance'] ?? 0) as num);
+      final a = ((r['Athlete'] ?? r['Competitor'] ?? r['Performance'] ?? 0) as num);
       final s = ((r['Student'] ?? r['Class'] ?? 0) as num);
       final t = ((r['Teammate'] ?? r['Program'] ?? 0) as num);
       final c = ((r['Citizen'] ?? r['Standard'] ?? 0) as num);
@@ -37,7 +37,7 @@ class LeaderboardController extends GetxController {
   }
 
   static const _categoryAliases = {
-    'Athlete': ['Athlete', 'Performance'],
+    'Athlete': ['Athlete', 'Competitor', 'Performance'],
     'Student': ['Student', 'Class', 'Classroom'],
     'Teammate': ['Teammate', 'Program'],
     'Citizen': ['Citizen', 'Standard'],
@@ -70,6 +70,34 @@ class LeaderboardController extends GetxController {
     final u = categoryLeader(categoryKey);
     if (u == null) return 0;
     return _categoryValue(u, categoryKey);
+  }
+
+  // ── Objective (Assessment) leaders: Power, Speed, GPA ──────────────────
+
+  double _objectiveValue(UserModel u, String key) {
+    final blob = u.assessmentData;
+    if (blob == null) return 0;
+    return (blob[key] as num?)?.toDouble() ?? 0;
+  }
+
+  UserModel? objectiveLeader(String key) {
+    if (ranked.isEmpty) return null;
+    UserModel? best;
+    double bestVal = -1;
+    for (final u in ranked) {
+      final v = _objectiveValue(u, key);
+      if (v > bestVal) {
+        bestVal = v;
+        best = u;
+      }
+    }
+    return (bestVal > 0) ? best : null;
+  }
+
+  double objectiveLeaderValue(String key) {
+    final u = objectiveLeader(key);
+    if (u == null) return 0;
+    return _objectiveValue(u, key);
   }
 
   void setTimeframe(int index) => selectedTimeframe.value = index;
@@ -139,6 +167,8 @@ class LeaderboardController extends GetxController {
   }
 
   bool _hasAnyPoints(UserModel u) {
+    // Curve / final OVR can be set while category buckets are still empty.
+    if (u.coachVisibleOvr > 0) return true;
     if (u.automatedOvr != null && u.automatedOvr! > 0) return true;
     if (u.currentRating.isEmpty) return false;
     for (final v in u.currentRating.values) {

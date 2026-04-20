@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import '../../core/constants/app_assets.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/widgets/app_logo.dart';
 import '../../core/widgets/stadium_background.dart';
-import '../../core/widgets/fire_sparks_background.dart';
+// import '../../core/widgets/fire_sparks_background.dart';
 import '../../core/widgets/glass_card.dart';
 import '../../core/widgets/glass_text_field.dart';
 import '../../core/widgets/arena_button.dart';
@@ -48,7 +48,7 @@ class ForgotPasswordView extends GetView<ForgotPasswordController> {
                         // Hero Logo
                         Hero(
                           tag: 'app_logo',
-                          child: Image.asset(AppAssets.logo, width: 140),
+                          child: const AppLogo(width: 140),
                         )
                         .animate()
                         .fade(duration: 1200.ms, curve: Curves.easeOutQuint)
@@ -87,6 +87,9 @@ class ForgotPasswordView extends GetView<ForgotPasswordController> {
                                 controller: controller.emailController,
                                 hintText: 'Email Address',
                                 prefixIcon: Icons.email_outlined,
+                                keyboardType: TextInputType.emailAddress,
+                                textInputAction: TextInputAction.done,
+                                autofillHints: const [AutofillHints.email],
                               ),
                               const SizedBox(height: 32),
                               

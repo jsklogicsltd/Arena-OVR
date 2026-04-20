@@ -95,6 +95,30 @@ class InviteCodeController extends GetxController {
         }
 
         final schoolId = team['schoolId'] as String?;
+        final baseline =
+            ((team['startingOvrBaseline'] ?? 50) as num).toInt().clamp(0, 90);
+
+        // ── Athlete-limit guard ─────────────────────────────────────────
+        if (schoolId != null && schoolId.isNotEmpty) {
+          final schoolDoc = await FirebaseFirestore.instance
+              .collection('schools')
+              .doc(schoolId)
+              .get();
+          final maxAthletes =
+              (schoolDoc.data()?['maxAthletesLimit'] as num?)?.toInt() ?? 60;
+          final currentAthletes = await FirebaseFirestore.instance
+              .collection('users')
+              .where('schoolId', isEqualTo: schoolId)
+              .where('role', isEqualTo: 'athlete')
+              .count()
+              .get();
+          if ((currentAthletes.count ?? 0) >= maxAthletes) {
+            throw Exception(
+              'School roster is full. Limit of $maxAthletes athletes reached.',
+            );
+          }
+        }
+        // ── End athlete-limit guard ─────────────────────────────────────
 
         await FirebaseFirestore.instance
             .collection('users')
@@ -102,6 +126,9 @@ class InviteCodeController extends GetxController {
             .update({
           'teamId': team['id'] ?? code,
           'schoolId': schoolId,
+          'ovr': baseline,
+          'actualOvr': baseline,
+          'finalOvr': baseline,
         });
 
         if (schoolId != null && schoolId.isNotEmpty) {

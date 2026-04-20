@@ -7,6 +7,8 @@ class SeasonModel {
   final int seasonNumber;
   final DateTime? startDate;
   final DateTime? endDate;
+  final int seasonLengthDays; // min 7
+  final int startingOvrBaseline; // min 0, max 90
   final bool isActive;
   final DateTime? revealDate;
   final DateTime? createdAt;
@@ -18,6 +20,8 @@ class SeasonModel {
     required this.seasonNumber,
     this.startDate,
     this.endDate,
+    this.seasonLengthDays = 15,
+    this.startingOvrBaseline = 50,
     this.isActive = true,
     this.revealDate,
     this.createdAt,
@@ -30,6 +34,8 @@ class SeasonModel {
     int? seasonNumber,
     DateTime? startDate,
     DateTime? endDate,
+    int? seasonLengthDays,
+    int? startingOvrBaseline,
     bool? isActive,
     DateTime? revealDate,
     DateTime? createdAt,
@@ -41,6 +47,8 @@ class SeasonModel {
       seasonNumber: seasonNumber ?? this.seasonNumber,
       startDate: startDate ?? this.startDate,
       endDate: endDate ?? this.endDate,
+      seasonLengthDays: seasonLengthDays ?? this.seasonLengthDays,
+      startingOvrBaseline: startingOvrBaseline ?? this.startingOvrBaseline,
       isActive: isActive ?? this.isActive,
       revealDate: revealDate ?? this.revealDate,
       createdAt: createdAt ?? this.createdAt,
@@ -55,6 +63,8 @@ class SeasonModel {
       seasonNumber: json['seasonNumber'] ?? 1,
       startDate: json['startDate'] != null ? (json['startDate'] as Timestamp).toDate() : null,
       endDate: json['endDate'] != null ? (json['endDate'] as Timestamp).toDate() : null,
+      seasonLengthDays: ((json['seasonLengthDays'] ?? 15) as num).toInt().clamp(7, 365),
+      startingOvrBaseline: ((json['startingOvrBaseline'] ?? 50) as num).toInt().clamp(0, 90),
       isActive: json['isActive'] ?? true,
       revealDate: json['revealDate'] != null ? (json['revealDate'] as Timestamp).toDate() : null,
       createdAt: json['createdAt'] != null ? (json['createdAt'] as Timestamp).toDate() : null,
@@ -69,6 +79,8 @@ class SeasonModel {
       'seasonNumber': seasonNumber,
       'startDate': startDate != null ? Timestamp.fromDate(startDate!) : null,
       'endDate': endDate != null ? Timestamp.fromDate(endDate!) : null,
+      'seasonLengthDays': seasonLengthDays,
+      'startingOvrBaseline': startingOvrBaseline,
       'isActive': isActive,
       'revealDate': revealDate != null ? Timestamp.fromDate(revealDate!) : null,
       'createdAt': createdAt != null ? Timestamp.fromDate(createdAt!) : null,

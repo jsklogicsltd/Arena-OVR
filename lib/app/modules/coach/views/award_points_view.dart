@@ -24,10 +24,29 @@ class AwardPointsView extends StatefulWidget {
 class _AwardPointsViewState extends State<AwardPointsView>
     with TickerProviderStateMixin {
   final CoachController controller = Get.find<CoachController>();
+  static const int _manualPointsMin = -20;
+  static const int _manualPointsMax = 20;
+  static const double _assessmentColWidth = 62;
+  static const double _spreadsheetAthleteColWidth = 130;
+  static const double _spreadsheetGap = 4;
+
+  /// Horizontal inset on header/row containers; must be included in [_spreadsheetTableWidth].
+  static const double _spreadsheetRowHPadding = 8;
+
+  /// Total horizontal width of the scrollable spreadsheet (padding + columns).
+  static double get _spreadsheetTableWidth =>
+      _spreadsheetRowHPadding * 2 +
+      _spreadsheetAthleteColWidth +
+      _spreadsheetGap +
+      (_assessmentColWidth * 9);
+
+  final ScrollController _assessmentHScroll = ScrollController();
 
   final Set<String> selectedAthleteIds = <String>{};
+
   /// Points per parent category (Athlete, Student, …).
   late Map<String, int> categoryPoints;
+
   /// Selected challenge label per parent category (required when points ≠ 0).
   late Map<String, String?> selectedChallenge;
   final TextEditingController _noteController = TextEditingController();
@@ -38,14 +57,17 @@ class _AwardPointsViewState extends State<AwardPointsView>
   final Map<String, Map<String, TextEditingController>> _bulkControllers = {};
   final Set<String> _modifiedAthleteIds = {};
   bool _isBulkSaving = false;
+
   /// When this changes (new season / reset), bulk assessment controllers are cleared.
   String? _assessmentControllersSeasonId;
   Worker? _seasonWorker;
 
   TextEditingController _ctrlFor(String uid, String event) {
     _bulkControllers[uid] ??= {};
-    return _bulkControllers[uid]!
-        .putIfAbsent(event, () => TextEditingController());
+    return _bulkControllers[uid]!.putIfAbsent(
+      event,
+      () => TextEditingController(),
+    );
   }
 
   void _disposeBulkControllers() {
@@ -59,8 +81,8 @@ class _AwardPointsViewState extends State<AwardPointsView>
 
   final List<Map<String, dynamic>> categoryDetails = [
     {
-      'id': 'Athlete',
-      'label': 'ATHLETE',
+      'id': ChallengeCatalog.competitorKey,
+      'label': 'COMPETITOR',
       'icon': Icons.local_fire_department,
       'color': const Color(0xFFE53935),
     },
@@ -94,9 +116,7 @@ class _AwardPointsViewState extends State<AwardPointsView>
     _tabController.addListener(() {
       if (!_tabController.indexIsChanging) setState(() {});
     });
-    categoryPoints = {
-      for (final c in ChallengeCatalog.parentCategories) c: 0,
-    };
+    categoryPoints = {for (final c in ChallengeCatalog.parentCategories) c: 0};
     selectedChallenge = {
       for (final c in ChallengeCatalog.parentCategories) c: null,
     };
@@ -116,6 +136,7 @@ class _AwardPointsViewState extends State<AwardPointsView>
 
   @override
   void dispose() {
+    _assessmentHScroll.dispose();
     _seasonWorker?.dispose();
     _tabController.dispose();
     _noteController.dispose();
@@ -210,25 +231,15 @@ class _AwardPointsViewState extends State<AwardPointsView>
   }
 
   String _categoryShortLabel(String id) {
-    switch (id) {
-      case 'Athlete':
-        return 'Ath';
-      case 'Student':
-        return 'Stu';
-      case 'Teammate':
-        return 'Tm';
-      case 'Citizen':
-        return 'Cit';
-      default:
-        return id;
-    }
+    return ChallengeCatalog.shortLabelForCategory(id);
   }
 
   String _categorySectionTitle(String id) {
     try {
-      return categoryDetails.firstWhere((c) => c['id'] == id)['label'] as String;
+      return categoryDetails.firstWhere((c) => c['id'] == id)['label']
+          as String;
     } catch (_) {
-      return id;
+      return ChallengeCatalog.displayLabelForCategory(id);
     }
   }
 
@@ -277,8 +288,9 @@ class _AwardPointsViewState extends State<AwardPointsView>
               return Container(
                 decoration: BoxDecoration(
                   color: const Color(0xFF0F172A),
-                  borderRadius:
-                      const BorderRadius.vertical(top: Radius.circular(22)),
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(22),
+                  ),
                   border: Border.all(
                     color: Colors.white.withValues(alpha: 0.08),
                     width: 1,
@@ -307,8 +319,11 @@ class _AwardPointsViewState extends State<AwardPointsView>
                               color: accent.withValues(alpha: 0.18),
                               borderRadius: BorderRadius.circular(12),
                             ),
-                            child: Icon(Icons.tune_rounded,
-                                color: accent, size: 20),
+                            child: Icon(
+                              Icons.tune_rounded,
+                              color: accent,
+                              size: 20,
+                            ),
                           ),
                           const SizedBox(width: 12),
                           Expanded(
@@ -325,8 +340,9 @@ class _AwardPointsViewState extends State<AwardPointsView>
                           if (validValue != null)
                             TextButton(
                               onPressed: () {
-                                setState(() =>
-                                    selectedChallenge[categoryId] = null);
+                                setState(
+                                  () => selectedChallenge[categoryId] = null,
+                                );
                                 Navigator.pop(ctx);
                               },
                               child: Text(
@@ -357,22 +373,28 @@ class _AwardPointsViewState extends State<AwardPointsView>
                               color: Colors.transparent,
                               child: InkWell(
                                 onTap: () {
-                                  setState(() =>
-                                      selectedChallenge[categoryId] = s);
+                                  setState(
+                                    () => selectedChallenge[categoryId] = s,
+                                  );
                                   Navigator.pop(ctx);
                                 },
                                 borderRadius: BorderRadius.circular(16),
                                 child: Container(
                                   padding: const EdgeInsets.symmetric(
-                                      horizontal: 14, vertical: 12),
+                                    horizontal: 14,
+                                    vertical: 12,
+                                  ),
                                   decoration: BoxDecoration(
                                     color: Colors.white.withValues(
-                                        alpha: selected ? 0.10 : 0.06),
+                                      alpha: selected ? 0.10 : 0.06,
+                                    ),
                                     borderRadius: BorderRadius.circular(16),
                                     border: Border.all(
                                       color: selected
                                           ? accent.withValues(alpha: 0.7)
-                                          : Colors.white.withValues(alpha: 0.08),
+                                          : Colors.white.withValues(
+                                              alpha: 0.08,
+                                            ),
                                       width: selected ? 1.4 : 1,
                                     ),
                                   ),
@@ -400,7 +422,9 @@ class _AwardPointsViewState extends State<AwardPointsView>
                                             : Icons.circle_outlined,
                                         color: selected
                                             ? accent
-                                            : Colors.white.withValues(alpha: 0.35),
+                                            : Colors.white.withValues(
+                                                alpha: 0.35,
+                                              ),
                                         size: 18,
                                       ),
                                     ],
@@ -478,14 +502,20 @@ class _AwardPointsViewState extends State<AwardPointsView>
     final color = cat['color'] as Color;
     final pts = categoryPoints[id] ?? 0;
     final active = pts != 0;
-    final challengeOk = (selectedChallenge[id] != null &&
+    final valueColor = pts < 0
+        ? const Color(0xFFEF4444)
+        : (pts > 0 ? const Color(0xFF4ADE80) : Colors.white);
+    final challengeOk =
+        (selectedChallenge[id] != null &&
         selectedChallenge[id]!.isNotEmpty &&
         ChallengeCatalog.challengesFor(id).contains(selectedChallenge[id]));
     final needsChallenge = active && !challengeOk;
 
     final cardBorder = needsChallenge
         ? const Color(0xFFFFB74D).withValues(alpha: 0.85)
-        : (active ? const Color(0xFF259DF4) : Colors.white.withValues(alpha: 0.12));
+        : (active
+              ? const Color(0xFF259DF4)
+              : Colors.white.withValues(alpha: 0.12));
 
     return Container(
       padding: const EdgeInsets.fromLTRB(12, 22, 12, 10),
@@ -544,7 +574,9 @@ class _AwardPointsViewState extends State<AwardPointsView>
                 isPlus: false,
                 onTap: () {
                   final v = categoryPoints[id] ?? 0;
-                  if (v > -99) setState(() => categoryPoints[id] = v - 1);
+                  if (v > _manualPointsMin) {
+                    setState(() => categoryPoints[id] = v - 1);
+                  }
                 },
               ),
               const SizedBox(width: 10),
@@ -557,14 +589,13 @@ class _AwardPointsViewState extends State<AwardPointsView>
                         '${(pts < 0 ? '-' : '')}${pts.abs().toString().padLeft(2, '0')}',
                         maxLines: 1,
                         style: GoogleFonts.spaceGrotesk(
-                          color: Colors.white,
+                          color: valueColor,
                           fontSize: 25,
                           fontWeight: FontWeight.w900,
                           height: 1.0,
                         ),
                       ),
                     ),
-
                   ],
                 ),
               ),
@@ -573,7 +604,9 @@ class _AwardPointsViewState extends State<AwardPointsView>
                 isPlus: true,
                 onTap: () {
                   final v = categoryPoints[id] ?? 0;
-                  if (v < 99) setState(() => categoryPoints[id] = v + 1);
+                  if (v < _manualPointsMax) {
+                    setState(() => categoryPoints[id] = v + 1);
+                  }
                 },
               ),
             ],
@@ -583,13 +616,12 @@ class _AwardPointsViewState extends State<AwardPointsView>
     );
   }
 
-  Widget _roundStepButton({
-    required bool isPlus,
-    required VoidCallback onTap,
-  }) {
+  Widget _roundStepButton({required bool isPlus, required VoidCallback onTap}) {
     final bg = isPlus ? const Color(0x334ADE80) : const Color(0x33EF4444);
     final border = isPlus ? const Color(0x664ADE80) : const Color(0x66EF4444);
-    final iconColor = isPlus ? const Color(0xFF4ADE80) : const Color(0xFFEF4444);
+    final iconColor = isPlus
+        ? const Color(0xFF4ADE80)
+        : const Color(0xFFEF4444);
     final icon = isPlus ? Icons.add : Icons.remove;
 
     return Material(
@@ -676,7 +708,9 @@ class _AwardPointsViewState extends State<AwardPointsView>
                         child: Container(
                           height: 2,
                           decoration: BoxDecoration(
-                            color: const Color(0xFF00A1FF).withValues(alpha: 0.6),
+                            color: const Color(
+                              0xFF00A1FF,
+                            ).withValues(alpha: 0.6),
                             borderRadius: BorderRadius.zero,
                           ),
                         ),
@@ -698,8 +732,11 @@ class _AwardPointsViewState extends State<AwardPointsView>
                           Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(Icons.checklist_rounded,
-                                  color: AppColors.tierGold, size: 22),
+                              Icon(
+                                Icons.checklist_rounded,
+                                color: AppColors.tierGold,
+                                size: 22,
+                              ),
                               const SizedBox(width: 10),
                               Text(
                                 'SELECT ATHLETES',
@@ -729,66 +766,127 @@ class _AwardPointsViewState extends State<AwardPointsView>
                                 final bn = b.name.trim().toLowerCase();
                                 return an.compareTo(bn);
                               });
-                            final roster = rosterAll.where((a) => _matchesRosterFilter(a, team)).toList();
+                            final roster = rosterAll
+                                .where((a) => _matchesRosterFilter(a, team))
+                                .toList();
                             if (rosterAll.isEmpty) {
                               return Padding(
                                 padding: const EdgeInsets.all(24),
                                 child: Text(
                                   'No athletes on roster.',
                                   style: GoogleFonts.inter(
-                                      color: Colors.white54, fontSize: 14),
+                                    color: Colors.white54,
+                                    fontSize: 14,
+                                  ),
                                 ),
                               );
                             }
-                            final selectAllVal = _selectAllValueForRoster(rosterAll);
+                            final selectAllVal = _selectAllValueForRoster(
+                              rosterAll,
+                            );
                             return Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.stretch,
                                 children: [
-                                  CheckboxListTile(
-                                    tristate: true,
-                                    value: selectAllVal,
-                                    onChanged: (v) {
-                                      setState(() {
-                                        if (v == true) {
-                                          selectedAthleteIds
-                                            ..clear()
-                                            ..addAll(rosterAll.map((e) => e.uid));
-                                        } else {
-                                          selectedAthleteIds.clear();
-                                        }
-                                      });
-                                      syncSelection();
-                                    },
-                                    activeColor: const Color(0xFF00A1FF),
-                                    checkColor: Colors.white,
-                                    side: BorderSide(
-                                        color: Colors.white
-                                            .withValues(alpha: 0.35)),
-                                    title: Text(
-                                      'Select All (Team)',
-                                      style: GoogleFonts.spaceGrotesk(
-                                        color: Colors.white,
-                                        fontSize: 15,
-                                        fontWeight: FontWeight.w800,
-                                      ),
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
                                     ),
-                                    subtitle: Text(
-                                      '${selectedAthleteIds.length} selected',
-                                      style: GoogleFonts.inter(
-                                          color: Colors.white54, fontSize: 12),
+                                    child: Row(
+                                      children: [
+                                        Expanded(
+                                          child: CheckboxListTile(
+                                            tristate: true,
+                                            value: selectAllVal,
+                                            onChanged: (v) {
+                                              setState(() {
+                                                if (v == true) {
+                                                  selectedAthleteIds
+                                                    ..clear()
+                                                    ..addAll(
+                                                      rosterAll.map((e) => e.uid),
+                                                    );
+                                                } else {
+                                                  selectedAthleteIds.clear();
+                                                }
+                                              });
+                                              syncSelection();
+                                            },
+                                            activeColor: const Color(0xFF00A1FF),
+                                            checkColor: Colors.white,
+                                            side: BorderSide(
+                                              color: Colors.white.withValues(
+                                                alpha: 0.35,
+                                              ),
+                                            ),
+                                            title: Text(
+                                              'Select All (Team)',
+                                              style: GoogleFonts.spaceGrotesk(
+                                                color: Colors.white,
+                                                fontSize: 15,
+                                                fontWeight: FontWeight.w800,
+                                              ),
+                                            ),
+                                            subtitle: Text(
+                                              '${selectedAthleteIds.length} selected',
+                                              style: GoogleFonts.inter(
+                                                color: Colors.white54,
+                                                fontSize: 12,
+                                              ),
+                                            ),
+                                            controlAffinity:
+                                                ListTileControlAffinity.leading,
+                                            contentPadding:
+                                                const EdgeInsets.symmetric(
+                                                  horizontal: 8,
+                                                ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        SizedBox(
+                                          height: 34,
+                                          child: ElevatedButton(
+                                            onPressed: () => Navigator.of(
+                                              sheetContext,
+                                            ).pop(),
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: const Color(
+                                                0xFF00A1FF,
+                                              ),
+                                              foregroundColor: Colors.white,
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 12,
+                                                  ),
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius:
+                                                    BorderRadius.circular(10),
+                                              ),
+                                            ),
+                                            child: Text(
+                                              'Done',
+                                              style: GoogleFonts.spaceGrotesk(
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.w700,
+                                                letterSpacing: 0.3,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
                                     ),
-                                    controlAffinity:
-                                        ListTileControlAffinity.leading,
-                                    contentPadding: const EdgeInsets.symmetric(
-                                        horizontal: 16),
                                   ),
                                   Divider(
-                                      height: 1,
-                                      color: Colors.white
-                                          .withValues(alpha: 0.08)),
+                                    height: 1,
+                                    color: Colors.white.withValues(alpha: 0.08),
+                                  ),
                                   Padding(
-                                    padding: const EdgeInsets.fromLTRB(16, 10, 16, 8),
+                                    padding: const EdgeInsets.fromLTRB(
+                                      16,
+                                      10,
+                                      16,
+                                      8,
+                                    ),
                                     child: SingleChildScrollView(
                                       scrollDirection: Axis.horizontal,
                                       physics: const BouncingScrollPhysics(),
@@ -797,25 +895,37 @@ class _AwardPointsViewState extends State<AwardPointsView>
                                             .asMap()
                                             .entries
                                             .map((e) {
-                                          final label = e.value;
-                                          final selected = _rosterFilter.trim().toLowerCase() ==
-                                              label.trim().toLowerCase();
-                                          return Padding(
-                                            padding: EdgeInsets.only(
-                                                right: e.key ==
-                                                        _tabsForTeam(team).length - 1
-                                                    ? 0
-                                                    : 10),
-                                            child: _filterChip(
-                                              label: label,
-                                              selected: selected,
-                                              onTap: () {
-                                                setState(() => _rosterFilter = label);
-                                                syncSelection();
-                                              },
-                                            ),
-                                          );
-                                        }).toList(),
+                                              final label = e.value;
+                                              final selected =
+                                                  _rosterFilter
+                                                      .trim()
+                                                      .toLowerCase() ==
+                                                  label.trim().toLowerCase();
+                                              return Padding(
+                                                padding: EdgeInsets.only(
+                                                  right:
+                                                      e.key ==
+                                                          _tabsForTeam(
+                                                                team,
+                                                              ).length -
+                                                              1
+                                                      ? 0
+                                                      : 10,
+                                                ),
+                                                child: _filterChip(
+                                                  label: label,
+                                                  selected: selected,
+                                                  onTap: () {
+                                                    setState(
+                                                      () =>
+                                                          _rosterFilter = label,
+                                                    );
+                                                    syncSelection();
+                                                  },
+                                                ),
+                                              );
+                                            })
+                                            .toList(),
                                       ),
                                     ),
                                   ),
@@ -824,35 +934,50 @@ class _AwardPointsViewState extends State<AwardPointsView>
                                       controller: scrollController,
                                       physics: const BouncingScrollPhysics(),
                                       padding: const EdgeInsets.only(
-                                          left: 8, right: 8, bottom: 28),
+                                        left: 8,
+                                        right: 8,
+                                        bottom: 28,
+                                      ),
                                       itemCount: roster.length,
                                       itemBuilder: (context, index) {
                                         final athlete = roster[index];
-                                        final tierColor = AppColors.getTierColor(
-                                            athlete.coachVisibleOvr);
+                                        final tierColor =
+                                            AppColors.getTierColor(
+                                              athlete.coachVisibleOvr,
+                                            );
                                         final checked = selectedAthleteIds
                                             .contains(athlete.uid);
                                         void toggle() {
                                           setState(() {
                                             if (checked) {
-                                              selectedAthleteIds.remove(athlete.uid);
+                                              selectedAthleteIds.remove(
+                                                athlete.uid,
+                                              );
                                             } else {
-                                              selectedAthleteIds.add(athlete.uid);
+                                              selectedAthleteIds.add(
+                                                athlete.uid,
+                                              );
                                             }
                                           });
                                           syncSelection();
                                         }
 
                                         return Padding(
-                                          padding: const EdgeInsets.only(bottom: 12),
+                                          padding: const EdgeInsets.only(
+                                            bottom: 12,
+                                          ),
                                           child: Material(
                                             color: Colors.transparent,
                                             child: InkWell(
                                               onTap: toggle,
-                                              borderRadius: BorderRadius.circular(22),
+                                              borderRadius:
+                                                  BorderRadius.circular(22),
                                               child: Container(
-                                                padding: const EdgeInsets.symmetric(
-                                                    horizontal: 16, vertical: 12),
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                      horizontal: 16,
+                                                      vertical: 12,
+                                                    ),
                                                 decoration: BoxDecoration(
                                                   color: Colors.white
                                                       .withValues(alpha: 0.05),
@@ -860,15 +985,25 @@ class _AwardPointsViewState extends State<AwardPointsView>
                                                       BorderRadius.circular(22),
                                                   border: Border.all(
                                                     color: tierColor.withValues(
-                                                        alpha: checked ? 0.85 : 0.45),
+                                                      alpha: checked
+                                                          ? 0.85
+                                                          : 0.45,
+                                                    ),
                                                     width: checked ? 1.6 : 1,
                                                   ),
                                                   boxShadow: [
                                                     BoxShadow(
-                                                      color: tierColor.withValues(
-                                                          alpha: checked ? 0.12 : 0.06),
+                                                      color: tierColor
+                                                          .withValues(
+                                                            alpha: checked
+                                                                ? 0.12
+                                                                : 0.06,
+                                                          ),
                                                       blurRadius: 14,
-                                                      offset: const Offset(0, 3),
+                                                      offset: const Offset(
+                                                        0,
+                                                        3,
+                                                      ),
                                                     ),
                                                   ],
                                                 ),
@@ -883,37 +1018,48 @@ class _AwardPointsViewState extends State<AwardPointsView>
                                                           // Add a clean 3px glow gap around it.
                                                           diameter: 62,
                                                           borderWidth: 3,
-                                                          duration: const Duration(seconds: 4),
+                                                          duration:
+                                                              const Duration(
+                                                                seconds: 4,
+                                                              ),
                                                           child: SizedBox(
                                                             width: 56,
                                                             height: 56,
                                                             child: Container(
-                                                              padding: const EdgeInsets.all(2),
+                                                              padding:
+                                                                  const EdgeInsets.all(
+                                                                    2,
+                                                                  ),
                                                               decoration: BoxDecoration(
-                                                                shape: BoxShape.circle,
+                                                                shape: BoxShape
+                                                                    .circle,
                                                                 border: Border.all(
-                                                                    color: tierColor,
-                                                                    width: 2),
+                                                                  color:
+                                                                      tierColor,
+                                                                  width: 2,
+                                                                ),
                                                               ),
                                                               child: CircleAvatar(
                                                                 radius: 26,
                                                                 backgroundColor:
-                                                                    Colors.white10,
-                                                                backgroundImage: athlete
-                                                                            .profilePicUrl !=
+                                                                    Colors
+                                                                        .white10,
+                                                                backgroundImage:
+                                                                    athlete.profilePicUrl !=
                                                                         null
                                                                     ? CachedNetworkImageProvider(
                                                                         athlete
                                                                             .profilePicUrl!,
                                                                       )
                                                                     : null,
-                                                                child: athlete
-                                                                            .profilePicUrl ==
+                                                                child:
+                                                                    athlete.profilePicUrl ==
                                                                         null
                                                                     ? const Icon(
-                                                                        Icons.person,
-                                                                        color:
-                                                                            Colors.white54,
+                                                                        Icons
+                                                                            .person,
+                                                                        color: Colors
+                                                                            .white54,
                                                                       )
                                                                     : null,
                                                               ),
@@ -926,27 +1072,32 @@ class _AwardPointsViewState extends State<AwardPointsView>
                                                           child: Container(
                                                             padding:
                                                                 const EdgeInsets.symmetric(
-                                                                    horizontal: 6,
-                                                                    vertical: 2),
+                                                                  horizontal: 6,
+                                                                  vertical: 2,
+                                                                ),
                                                             decoration: BoxDecoration(
                                                               color: tierColor,
                                                               borderRadius:
-                                                                  BorderRadius
-                                                                      .circular(8),
+                                                                  BorderRadius.circular(
+                                                                    8,
+                                                                  ),
                                                               border: Border.all(
-                                                                color: const Color(
-                                                                    0xFF1E293B),
+                                                                color:
+                                                                    const Color(
+                                                                      0xFF1E293B,
+                                                                    ),
                                                                 width: 1,
                                                               ),
                                                             ),
                                                             child: Text(
                                                               '${athlete.coachVisibleOvr}',
-                                                              style: GoogleFonts
-                                                                  .spaceGrotesk(
-                                                                color: Colors.white,
+                                                              style: GoogleFonts.spaceGrotesk(
+                                                                color: Colors
+                                                                    .white,
                                                                 fontSize: 11,
                                                                 fontWeight:
-                                                                    FontWeight.w800,
+                                                                    FontWeight
+                                                                        .w800,
                                                               ),
                                                             ),
                                                           ),
@@ -957,52 +1108,67 @@ class _AwardPointsViewState extends State<AwardPointsView>
                                                     Expanded(
                                                       child: Column(
                                                         crossAxisAlignment:
-                                                            CrossAxisAlignment.start,
+                                                            CrossAxisAlignment
+                                                                .start,
                                                         children: [
                                                           Text(
                                                             athlete.name,
                                                             maxLines: 1,
                                                             overflow:
-                                                                TextOverflow.ellipsis,
-                                                            style: GoogleFonts
-                                                                .spaceGrotesk(
-                                                              color: Colors.white,
-                                                              fontSize: 16,
-                                                              fontWeight:
-                                                                  FontWeight.w700,
-                                                            ),
+                                                                TextOverflow
+                                                                    .ellipsis,
+                                                            style:
+                                                                GoogleFonts.spaceGrotesk(
+                                                                  color: Colors
+                                                                      .white,
+                                                                  fontSize: 16,
+                                                                  fontWeight:
+                                                                      FontWeight
+                                                                          .w700,
+                                                                ),
                                                           ),
-                                                          const SizedBox(height: 2),
+                                                          const SizedBox(
+                                                            height: 2,
+                                                          ),
                                                           Text(
                                                             '#${athlete.displayJerseyNumber} • ${(athlete.positionGroup ?? 'ATHLETE').toString().toUpperCase()}',
-                                                            style: GoogleFonts.inter(
-                                                              color: Colors.white54,
-                                                              fontSize: 12,
-                                                            ),
+                                                            style:
+                                                                GoogleFonts.inter(
+                                                                  color: Colors
+                                                                      .white54,
+                                                                  fontSize: 12,
+                                                                ),
                                                           ),
                                                         ],
                                                       ),
                                                     ),
                                                     Theme(
                                                       data: Theme.of(context).copyWith(
-                                                        checkboxTheme: CheckboxThemeData(
-                                                          shape: RoundedRectangleBorder(
-                                                            borderRadius:
-                                                                BorderRadius.circular(
-                                                                    6),
-                                                          ),
-                                                        ),
+                                                        checkboxTheme:
+                                                            CheckboxThemeData(
+                                                              shape: RoundedRectangleBorder(
+                                                                borderRadius:
+                                                                    BorderRadius.circular(
+                                                                      6,
+                                                                    ),
+                                                              ),
+                                                            ),
                                                       ),
                                                       child: Checkbox(
                                                         value: checked,
-                                                        onChanged: (_) => toggle(),
+                                                        onChanged: (_) =>
+                                                            toggle(),
                                                         activeColor:
-                                                            const Color(0xFF00A1FF),
-                                                        checkColor: Colors.white,
+                                                            const Color(
+                                                              0xFF00A1FF,
+                                                            ),
+                                                        checkColor:
+                                                            Colors.white,
                                                         side: BorderSide(
                                                           color: Colors.white
                                                               .withValues(
-                                                                  alpha: 0.35),
+                                                                alpha: 0.35,
+                                                              ),
                                                         ),
                                                       ),
                                                     ),
@@ -1034,14 +1200,21 @@ class _AwardPointsViewState extends State<AwardPointsView>
 
   void _submit() async {
     if (selectedAthleteIds.isEmpty) {
-      Get.snackbar('Error', 'Please select at least one athlete.',
-          backgroundColor: AppColors.primary, colorText: Colors.white);
+      Get.snackbar(
+        'Error',
+        'Please select at least one athlete.',
+        backgroundColor: AppColors.primary,
+        colorText: Colors.white,
+      );
       return;
     }
     if (_nonZeroCategoryCount == 0) {
-      Get.snackbar('Error',
-          'Set OVR points for at least one category (− / +).',
-          backgroundColor: AppColors.primary, colorText: Colors.white);
+      Get.snackbar(
+        'Error',
+        'Set OVR points for at least one category (− / +).',
+        backgroundColor: AppColors.primary,
+        colorText: Colors.white,
+      );
       return;
     }
 
@@ -1066,11 +1239,7 @@ class _AwardPointsViewState extends State<AwardPointsView>
       final v = categoryPoints[id] ?? 0;
       if (v == 0) continue;
       final ch = selectedChallenge[id]!;
-      awards.add(CategoryAwardInput(
-        category: id,
-        subcategory: ch,
-        value: v,
-      ));
+      awards.add(CategoryAwardInput(category: id, subcategory: ch, value: v));
     }
 
     final roster = List<UserModel>.from(controller.roster);
@@ -1078,8 +1247,12 @@ class _AwardPointsViewState extends State<AwardPointsView>
         .where((id) => roster.any((a) => a.uid == id))
         .toList();
     if (ids.isEmpty) {
-      Get.snackbar('Error', 'No valid athletes selected.',
-          backgroundColor: AppColors.primary, colorText: Colors.white);
+      Get.snackbar(
+        'Error',
+        'No valid athletes selected.',
+        backgroundColor: AppColors.primary,
+        colorText: Colors.white,
+      );
       return;
     }
 
@@ -1104,10 +1277,11 @@ class _AwardPointsViewState extends State<AwardPointsView>
       });
 
       Get.snackbar(
-          'Success',
-          'Awards applied to ${ids.length} athlete(s) (${awards.length} challenge line(s) each).',
-          backgroundColor: AppColors.tierGold,
-          colorText: Colors.black);
+        'Success',
+        'Awards applied to ${ids.length} athlete(s) (${awards.length} challenge line(s) each).',
+        backgroundColor: AppColors.tierGold,
+        colorText: Colors.black,
+      );
     } catch (e) {
       setState(() => isLoading = false);
       Get.snackbar('Error', 'Failed to submit points: $e');
@@ -1120,12 +1294,15 @@ class _AwardPointsViewState extends State<AwardPointsView>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('SELECT ATHLETES',
-            style: GoogleFonts.spaceGrotesk(
-                color: Colors.white54,
-                fontSize: 11,
-                letterSpacing: 1.5,
-                fontWeight: FontWeight.bold)),
+        Text(
+          'SELECT ATHLETES',
+          style: GoogleFonts.spaceGrotesk(
+            color: Colors.white54,
+            fontSize: 11,
+            letterSpacing: 1.5,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
         const SizedBox(height: 12),
         Obx(() {
           final roster = controller.roster.toList()
@@ -1151,8 +1328,8 @@ class _AwardPointsViewState extends State<AwardPointsView>
           final summary = n == 0
               ? 'Tap to choose players'
               : n == roster.length
-                  ? 'Full team ($n players)'
-                  : '$n of ${roster.length} selected';
+              ? 'Full team ($n players)'
+              : '$n of ${roster.length} selected';
 
           return GestureDetector(
             behavior: HitTestBehavior.opaque,
@@ -1160,8 +1337,7 @@ class _AwardPointsViewState extends State<AwardPointsView>
             child: GlassCard(
               backgroundColor: Colors.white.withValues(alpha: 0.05),
               leftBorderColor: const Color(0xFF00A1FF),
-              padding: const EdgeInsets.symmetric(
-                  horizontal: 16, vertical: 14),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
               child: Row(
                 children: [
                   Container(
@@ -1170,8 +1346,11 @@ class _AwardPointsViewState extends State<AwardPointsView>
                       color: const Color(0xFF00A1FF).withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(16),
                     ),
-                    child: const Icon(Icons.groups_rounded,
-                        color: Color(0xFF00A1FF), size: 28),
+                    child: const Icon(
+                      Icons.groups_rounded,
+                      color: Color(0xFF00A1FF),
+                      size: 28,
+                    ),
                   ),
                   const SizedBox(width: 16),
                   Expanded(
@@ -1211,7 +1390,7 @@ class _AwardPointsViewState extends State<AwardPointsView>
     );
   }
 
-  // ── Manual Ratings tab body ───────────────────────────────────────────────
+  // ── Subjective (Manual 50%) tab body ──────────────────────────────────────
 
   Widget _buildManualRatingsBody() {
     final keyboardBottom = MediaQuery.viewInsetsOf(context).bottom;
@@ -1227,114 +1406,136 @@ class _AwardPointsViewState extends State<AwardPointsView>
               .slideX(begin: -0.1, curve: Curves.easeOutCubic),
           const SizedBox(height: 32),
 
-          LayoutBuilder(builder: (context, constraints) {
-            const crossAxisCount = 2;
-            const spacing = 14.0;
-            const ratio = 173 / 210;
+          LayoutBuilder(
+                builder: (context, constraints) {
+                  const crossAxisCount = 2;
+                  const spacing = 14.0;
+                  const ratio = 173 / 210;
 
-            return GridView.count(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              crossAxisCount: crossAxisCount,
-              crossAxisSpacing: spacing,
-              mainAxisSpacing: spacing,
-              childAspectRatio: ratio,
-              children: categoryDetails.map(_categoryAwardBlock).toList(),
-            );
-          }).animate(delay: 200.ms).fade(duration: 400.ms).slideX(begin: -0.1, curve: Curves.easeOutCubic),
+                  return GridView.count(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    crossAxisCount: crossAxisCount,
+                    crossAxisSpacing: spacing,
+                    mainAxisSpacing: spacing,
+                    childAspectRatio: ratio,
+                    children: categoryDetails.map(_categoryAwardBlock).toList(),
+                  );
+                },
+              )
+              .animate(delay: 200.ms)
+              .fade(duration: 400.ms)
+              .slideX(begin: -0.1, curve: Curves.easeOutCubic),
 
           const SizedBox(height: 12),
 
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('ADD COACH NOTE',
-                  style: GoogleFonts.spaceGrotesk(
-                      color: Colors.white,
-                      fontSize: 13,
-                      letterSpacing: 1.5,
-                      fontWeight: FontWeight.bold)),
-              Text('Visibility: Athlete & Staff',
-                  style:
-                      GoogleFonts.inter(color: Colors.white54, fontSize: 12)),
+              Text(
+                'ADD COACH NOTE',
+                style: GoogleFonts.spaceGrotesk(
+                  color: Colors.white,
+                  fontSize: 13,
+                  letterSpacing: 1.5,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              Text(
+                'Visibility: Athlete & Staff',
+                style: GoogleFonts.inter(color: Colors.white54, fontSize: 12),
+              ),
             ],
           ),
           const SizedBox(height: 12),
           Container(
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.05),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: Colors.white.withOpacity(0.1)),
-            ),
-            child: TextField(
-              controller: _noteController,
-              maxLines: 2,
-              style: GoogleFonts.inter(color: Colors.white, fontSize: 16),
-              decoration: InputDecoration(
-                hintText:
-                    'Great footwork in the red zone today. Keep that intensity up!',
-                hintStyle: GoogleFonts.inter(color: Colors.white38),
-                border: InputBorder.none,
-                contentPadding: const EdgeInsets.all(20),
-              ),
-            ),
-          ).animate(delay: 400.ms).fade(duration: 400.ms).slideX(begin: -0.1, curve: Curves.easeOutCubic),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.05),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: Colors.white.withOpacity(0.1)),
+                ),
+                child: TextField(
+                  controller: _noteController,
+                  maxLines: 2,
+                  style: GoogleFonts.inter(color: Colors.white, fontSize: 16),
+                  decoration: InputDecoration(
+                    hintText:
+                        'Great footwork in the red zone today. Keep that intensity up!',
+                    hintStyle: GoogleFonts.inter(color: Colors.white38),
+                    border: InputBorder.none,
+                    contentPadding: const EdgeInsets.all(20),
+                  ),
+                ),
+              )
+              .animate(delay: 400.ms)
+              .fade(duration: 400.ms)
+              .slideX(begin: -0.1, curve: Curves.easeOutCubic),
 
           const SizedBox(height: 32),
 
           Obx(() {
             if (controller.roster.isEmpty) return const SizedBox.shrink();
             return GestureDetector(
-              onTap: isLoading ? null : _submit,
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(vertical: 20),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF4DA0FF), Color(0xFF1E50FF)],
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                  ),
-                  borderRadius: BorderRadius.circular(24),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFF2979FF).withOpacity(0.4),
-                      blurRadius: 20,
-                      spreadRadius: 0,
-                      offset: const Offset(0, 8),
-                    )
-                  ],
-                ),
-                child: isLoading
-                    ? const Center(
-                        child: SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(
-                                color: Colors.white, strokeWidth: 2)))
-                    : Column(
-                        children: [
-                          Text(
-                            'Apply Points',
-                            style: GoogleFonts.spaceGrotesk(
-                                color: Colors.white,
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                letterSpacing: 1.5),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            selectedAthleteIds.isEmpty
-                                ? _categoryPointsSummaryLine()
-                                : '${selectedAthleteIds.length} athlete(s) · ${_categoryPointsSummaryLine()}',
-                            textAlign: TextAlign.center,
-                            style: GoogleFonts.inter(
-                                color: Colors.white70, fontSize: 11),
-                          ),
-                        ],
+                  onTap: isLoading ? null : _submit,
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 20),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF4DA0FF), Color(0xFF1E50FF)],
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
                       ),
-              ),
-            ).animate(delay: 500.ms).fade(duration: 400.ms).slideX(begin: -0.1, curve: Curves.easeOutCubic);
+                      borderRadius: BorderRadius.circular(24),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF2979FF).withOpacity(0.4),
+                          blurRadius: 20,
+                          spreadRadius: 0,
+                          offset: const Offset(0, 8),
+                        ),
+                      ],
+                    ),
+                    child: isLoading
+                        ? const Center(
+                            child: SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                                strokeWidth: 2,
+                              ),
+                            ),
+                          )
+                        : Column(
+                            children: [
+                              Text(
+                                'Apply points',
+                                style: GoogleFonts.spaceGrotesk(
+                                  color: Colors.white,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 1.5,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                selectedAthleteIds.isEmpty
+                                    ? _categoryPointsSummaryLine()
+                                    : '${selectedAthleteIds.length} athlete(s) · ${_categoryPointsSummaryLine()}',
+                                textAlign: TextAlign.center,
+                                style: GoogleFonts.inter(
+                                  color: Colors.white70,
+                                  fontSize: 11,
+                                ),
+                              ),
+                            ],
+                          ),
+                  ),
+                )
+                .animate(delay: 500.ms)
+                .fade(duration: 400.ms)
+                .slideX(begin: -0.1, curve: Curves.easeOutCubic);
           }),
 
           const SizedBox(height: 60),
@@ -1343,7 +1544,7 @@ class _AwardPointsViewState extends State<AwardPointsView>
     );
   }
 
-  // ── Assessments (Automated) – Bulk Spreadsheet Mode ──────────────────────
+  // ── Objective (Assessment 50%) – Bulk Spreadsheet Mode ───────────────────
 
   List<UserModel> _sortedRosterForAssessments() {
     final list = List<UserModel>.from(controller.roster);
@@ -1354,10 +1555,10 @@ class _AwardPointsViewState extends State<AwardPointsView>
 
       final partsA = a.name.trim().split(RegExp(r'\s+'));
       final partsB = b.name.trim().split(RegExp(r'\s+'));
-      final lastA =
-          (partsA.length > 1 ? partsA.last : partsA.first).toLowerCase();
-      final lastB =
-          (partsB.length > 1 ? partsB.last : partsB.first).toLowerCase();
+      final lastA = (partsA.length > 1 ? partsA.last : partsA.first)
+          .toLowerCase();
+      final lastB = (partsB.length > 1 ? partsB.last : partsB.first)
+          .toLowerCase();
       final c = lastA.compareTo(lastB);
       if (c != 0) return c;
       return partsA.first.toLowerCase().compareTo(partsB.first.toLowerCase());
@@ -1391,25 +1592,26 @@ class _AwardPointsViewState extends State<AwardPointsView>
         decoration: InputDecoration(
           hintText: hint,
           hintStyle: GoogleFonts.inter(
-              color: Colors.white.withValues(alpha: 0.16), fontSize: 11),
+            color: Colors.white.withValues(alpha: 0.16),
+            fontSize: 11,
+          ),
           filled: true,
           fillColor: Colors.white.withValues(alpha: 0.06),
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 4,
+            vertical: 8,
+          ),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(8),
-            borderSide:
-                BorderSide(color: Colors.white.withValues(alpha: 0.10)),
+            borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.10)),
           ),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(8),
-            borderSide:
-                BorderSide(color: Colors.white.withValues(alpha: 0.10)),
+            borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.10)),
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(8),
-            borderSide: const BorderSide(
-                color: Color(0xFF00A1FF), width: 1.5),
+            borderSide: const BorderSide(color: Color(0xFF00A1FF), width: 1.5),
           ),
         ),
       ),
@@ -1424,8 +1626,12 @@ class _AwardPointsViewState extends State<AwardPointsView>
       letterSpacing: 0.8,
     );
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 12),
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+      padding: const EdgeInsets.fromLTRB(
+        _spreadsheetRowHPadding,
+        10,
+        _spreadsheetRowHPadding,
+        10,
+      ),
       decoration: BoxDecoration(
         border: Border(
           bottom: BorderSide(color: Colors.white.withValues(alpha: 0.12)),
@@ -1434,21 +1640,28 @@ class _AwardPointsViewState extends State<AwardPointsView>
       child: Row(
         children: [
           const SizedBox(
-            width: 130,
+            width: _spreadsheetAthleteColWidth,
             child: Text('ATHLETE', style: headerStyle),
           ),
-          const SizedBox(width: 4),
+          const SizedBox(width: _spreadsheetGap),
           ...[
             ('SQ', const Color(0xFFE53935)),
             ('BP', const Color(0xFFE53935)),
+            ('PC', const Color(0xFFE53935)),
+            ('DL', const Color(0xFFE53935)),
             ('40yd', const Color(0xFF4CAF50)),
+            ('10yd', const Color(0xFF4CAF50)),
+            ('VJ', const Color(0xFF4CAF50)),
+            ('BJ', const Color(0xFF4CAF50)),
             ('GPA', const Color(0xFFFFB300)),
-          ].map((e) => Expanded(
-                child: Center(
-                  child: Text(e.$1,
-                      style: headerStyle.copyWith(color: e.$2)),
-                ),
-              )),
+          ].map(
+            (e) => SizedBox(
+              width: _assessmentColWidth,
+              child: Center(
+                child: Text(e.$1, style: headerStyle.copyWith(color: e.$2)),
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -1458,111 +1671,141 @@ class _AwardPointsViewState extends State<AwardPointsView>
     final existing = athlete.assessmentData;
     final isDirty = _modifiedAthleteIds.contains(athlete.uid);
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 12),
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+      padding: const EdgeInsets.fromLTRB(
+        _spreadsheetRowHPadding,
+        8,
+        _spreadsheetRowHPadding,
+        8,
+      ),
       decoration: BoxDecoration(
         color: isDirty
             ? const Color(0xFF00C853).withValues(alpha: 0.06)
             : index.isEven
-                ? Colors.white.withValues(alpha: 0.025)
-                : Colors.transparent,
+            ? Colors.white.withValues(alpha: 0.025)
+            : Colors.transparent,
         border: Border(
-          left: isDirty
-              ? const BorderSide(color: Color(0xFF00C853), width: 3)
-              : BorderSide.none,
           bottom: BorderSide(color: Colors.white.withValues(alpha: 0.06)),
         ),
       ),
-      child: Row(
+      child: Stack(
+        clipBehavior: Clip.hardEdge,
+        alignment: Alignment.centerLeft,
         children: [
-          SizedBox(
-            width: 130,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  _displayLastFirst(athlete.name),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.spaceGrotesk(
-                    color: Colors.white,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Row(
+          Row(
+            children: [
+              SizedBox(
+                width: _spreadsheetAthleteColWidth,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    if (athlete.grade != null)
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 1),
-                        decoration: BoxDecoration(
-                          color:
-                              const Color(0xFF00A1FF).withValues(alpha: 0.18),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          'Gr ${athlete.grade}',
-                          style: GoogleFonts.spaceGrotesk(
-                            color: const Color(0xFF00A1FF),
-                            fontSize: 9,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
+                    Text(
+                      _displayLastFirst(athlete.name),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.spaceGrotesk(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
                       ),
-                    if (athlete.automatedOvr != null &&
-                        athlete.automatedOvr! > 0) ...[
-                      const SizedBox(width: 4),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 5, vertical: 1),
-                        decoration: BoxDecoration(
-                          color:
-                              const Color(0xFF00C853).withValues(alpha: 0.18),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          '${athlete.automatedOvr}',
-                          style: GoogleFonts.spaceGrotesk(
-                            color: const Color(0xFF00C853),
-                            fontSize: 9,
-                            fontWeight: FontWeight.w800,
+                    ),
+                    const SizedBox(height: 2),
+                    Row(
+                      children: [
+                        if (athlete.grade != null)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 1,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(
+                                0xFF00A1FF,
+                              ).withValues(alpha: 0.18),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              'Gr ${athlete.grade}',
+                              style: GoogleFonts.spaceGrotesk(
+                                color: const Color(0xFF00A1FF),
+                                fontSize: 9,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
                           ),
-                        ),
-                      ),
-                    ],
+                        if (athlete.automatedOvr != null &&
+                            athlete.automatedOvr! > 0) ...[
+                          const SizedBox(width: 4),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 5,
+                              vertical: 1,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(
+                                0xFF00C853,
+                              ).withValues(alpha: 0.18),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              '${athlete.automatedOvr}',
+                              style: GoogleFonts.spaceGrotesk(
+                                color: const Color(0xFF00C853),
+                                fontSize: 9,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
                   ],
                 ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 4),
-          ...[
-            ('squat', existing?['squat']),
-            ('bench', existing?['bench_press']),
-            ('dash40', existing?['40_yard_dash']),
-            ('gpa', existing?['gpa']),
-          ].map((e) {
-            final ctrl = _ctrlFor(athlete.uid, e.$1);
-            // Keep fields in sync with Firestore when the row isn't dirty (e.g. after season reset).
-            if (!_modifiedAthleteIds.contains(athlete.uid)) {
-              final desired = e.$2 == null ? '' : '${e.$2}';
-              if (ctrl.text != desired) ctrl.text = desired;
-            }
-            return Expanded(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 2),
-                child: _compactField(ctrl,
-                    hint: e.$2 != null ? '${e.$2}' : '—',
-                    onChanged: () {
-                      if (_modifiedAthleteIds.add(athlete.uid)) {
-                        setState(() {});
-                      }
-                    }),
               ),
-            );
-          }),
+              const SizedBox(width: _spreadsheetGap),
+              ...[
+                ('squat', existing?['squat']),
+                ('bench', existing?['bench_press']),
+                ('powerClean', existing?['power_clean']),
+                ('deadLift', existing?['dead_lift']),
+                ('dash40', existing?['40_yard_dash']),
+                ('fly10', existing?['10_yard_fly']),
+                ('verticalJump', existing?['vertical_jump']),
+                ('broadJump', existing?['standing_long_jump']),
+                ('gpa', existing?['gpa']),
+              ].map((e) {
+                final ctrl = _ctrlFor(athlete.uid, e.$1);
+                // Keep fields in sync with Firestore when the row isn't dirty (e.g. after season reset).
+                if (!_modifiedAthleteIds.contains(athlete.uid)) {
+                  final desired = e.$2 == null ? '' : '${e.$2}';
+                  if (ctrl.text != desired) ctrl.text = desired;
+                }
+                return SizedBox(
+                  width: _assessmentColWidth,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 2),
+                    child: _compactField(
+                      ctrl,
+                      hint: e.$2 != null ? '${e.$2}' : '—',
+                      onChanged: () {
+                        if (_modifiedAthleteIds.add(athlete.uid)) {
+                          setState(() {});
+                        }
+                      },
+                    ),
+                  ),
+                );
+              }),
+            ],
+          ),
+          if (isDirty)
+            Positioned(
+              left: 0,
+              top: 0,
+              bottom: 0,
+              child: IgnorePointer(
+                child: Container(width: 3, color: const Color(0xFF00C853)),
+              ),
+            ),
         ],
       ),
     );
@@ -1580,25 +1823,50 @@ class _AwardPointsViewState extends State<AwardPointsView>
 
       final squat = double.tryParse(ctrls['squat']?.text.trim() ?? '');
       final bench = double.tryParse(ctrls['bench']?.text.trim() ?? '');
+      final powerClean = double.tryParse(
+        ctrls['powerClean']?.text.trim() ?? '',
+      );
+      final deadLift = double.tryParse(ctrls['deadLift']?.text.trim() ?? '');
       final dash = double.tryParse(ctrls['dash40']?.text.trim() ?? '');
+      final fly10 = double.tryParse(ctrls['fly10']?.text.trim() ?? '');
+      final verticalJump = double.tryParse(
+        ctrls['verticalJump']?.text.trim() ?? '',
+      );
+      final broadJump = double.tryParse(ctrls['broadJump']?.text.trim() ?? '');
       final gpa = double.tryParse(ctrls['gpa']?.text.trim() ?? '');
 
-      if (squat == null && bench == null && dash == null) {
+      if (squat == null &&
+          bench == null &&
+          powerClean == null &&
+          deadLift == null &&
+          dash == null &&
+          fly10 == null &&
+          verticalJump == null &&
+          broadJump == null &&
+          gpa == null) {
         skipped++;
         continue;
       }
       data[uid] = {
         'squat': squat,
         'bench': bench,
+        'powerClean': powerClean,
+        'deadLift': deadLift,
         'dash40': dash,
+        'fly10': fly10,
+        'verticalJump': verticalJump,
+        'broadJump': broadJump,
         'gpa': gpa,
       };
     }
 
     if (data.isEmpty) {
-      Get.snackbar('No Athletic Data',
-          '$skipped modified athlete(s) had no SQ/BP/40yd values to score.',
-          backgroundColor: AppColors.primary, colorText: Colors.white);
+      Get.snackbar(
+        'No Athletic Data',
+        '$skipped modified athlete(s) had no assessment fields to score.',
+        backgroundColor: AppColors.primary,
+        colorText: Colors.white,
+      );
       return;
     }
 
@@ -1608,15 +1876,18 @@ class _AwardPointsViewState extends State<AwardPointsView>
       final saved = data.length;
       setState(() => _modifiedAthleteIds.clear());
       Get.snackbar(
-        'Assessments Saved',
-        'Scored $saved athlete${saved == 1 ? '' : 's'} '
-            '& recalculated team OVR.',
+        'Saved',
+        'Updated $saved athlete${saved == 1 ? '' : 's'}.',
         backgroundColor: AppColors.tierGold,
         colorText: Colors.black,
       );
     } catch (e) {
-      Get.snackbar('Error', 'Failed to save assessments: $e',
-          backgroundColor: AppColors.primary, colorText: Colors.white);
+      Get.snackbar(
+        'Error',
+        'Failed to save assessments: $e',
+        backgroundColor: AppColors.primary,
+        colorText: Colors.white,
+      );
     } finally {
       setState(() => _isBulkSaving = false);
     }
@@ -1630,15 +1901,19 @@ class _AwardPointsViewState extends State<AwardPointsView>
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.people_outline_rounded,
-                  color: Colors.white.withValues(alpha: 0.15), size: 64),
+              Icon(
+                Icons.people_outline_rounded,
+                color: Colors.white.withValues(alpha: 0.15),
+                size: 64,
+              ),
               const SizedBox(height: 12),
               Text(
                 'No athletes on roster',
                 style: GoogleFonts.spaceGrotesk(
-                    color: Colors.white38,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600),
+                  color: Colors.white38,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ],
           ),
@@ -1649,99 +1924,82 @@ class _AwardPointsViewState extends State<AwardPointsView>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 4),
+            padding: const EdgeInsets.fromLTRB(20, 10, 20, 8),
             child: Row(
               children: [
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('BULK ASSESSMENT ENTRY',
-                          style: GoogleFonts.spaceGrotesk(
-                              color: Colors.white54,
-                              fontSize: 10,
-                              letterSpacing: 1.5,
-                              fontWeight: FontWeight.w800)),
-                      const SizedBox(height: 4),
+                      Text(
+                        'ASSESSMENTS',
+                        style: GoogleFonts.spaceGrotesk(
+                          color: Colors.white70,
+                          fontSize: 11,
+                          letterSpacing: 2.0,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
                       Text(
                         _modifiedAthleteIds.isEmpty
-                            ? '${athletes.length} athletes · Sorted by grade & name'
-                            : '${athletes.length} athletes · ${_modifiedAthleteIds.length} modified',
+                            ? '${athletes.length} athletes'
+                            : '${athletes.length} athletes · ${_modifiedAthleteIds.length} unsaved',
                         style: GoogleFonts.inter(
-                            color: _modifiedAthleteIds.isEmpty
-                                ? Colors.white30
-                                : const Color(0xFF00C853),
-                            fontSize: 11),
-                      ),
-                    ],
-                  ),
-                ),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.06),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        width: 8,
-                        height: 8,
-                        decoration: const BoxDecoration(
-                          color: Color(0xFFE53935),
-                          shape: BoxShape.circle,
+                          color: _modifiedAthleteIds.isEmpty
+                              ? Colors.white30
+                              : const Color(0xFF00C853),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
-                      const SizedBox(width: 4),
-                      Text('Power',
-                          style: GoogleFonts.spaceGrotesk(
-                              color: Colors.white38, fontSize: 9)),
-                      const SizedBox(width: 8),
-                      Container(
-                        width: 8,
-                        height: 8,
-                        decoration: const BoxDecoration(
-                          color: Color(0xFF4CAF50),
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      Text('Speed',
-                          style: GoogleFonts.spaceGrotesk(
-                              color: Colors.white38, fontSize: 9)),
-                      const SizedBox(width: 8),
-                      Container(
-                        width: 8,
-                        height: 8,
-                        decoration: const BoxDecoration(
-                          color: Color(0xFFFFB300),
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      Text('Acad',
-                          style: GoogleFonts.spaceGrotesk(
-                              color: Colors.white38, fontSize: 9)),
                     ],
                   ),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 8),
-          _buildSpreadsheetHeader(),
           Expanded(
-            child: ListView.builder(
-              padding: EdgeInsets.only(
-                bottom: 170 + MediaQuery.viewInsetsOf(context).bottom,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  return Scrollbar(
+                    controller: _assessmentHScroll,
+                    thumbVisibility: true,
+                    child: SingleChildScrollView(
+                      controller: _assessmentHScroll,
+                      scrollDirection: Axis.horizontal,
+                      physics: const BouncingScrollPhysics(),
+                      child: SizedBox(
+                        width: _spreadsheetTableWidth,
+                        height: constraints.maxHeight,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            _buildSpreadsheetHeader(),
+                            Expanded(
+                              child: ListView.builder(
+                                padding: EdgeInsets.only(
+                                  bottom:
+                                      170 +
+                                      MediaQuery.viewInsetsOf(context).bottom,
+                                ),
+                                keyboardDismissBehavior:
+                                    ScrollViewKeyboardDismissBehavior.onDrag,
+                                physics: const BouncingScrollPhysics(),
+                                itemCount: athletes.length,
+                                itemBuilder: (ctx, i) =>
+                                    _buildAthleteAssessmentRow(athletes[i], i),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
+                },
               ),
-              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-              physics: const BouncingScrollPhysics(),
-              itemCount: athletes.length,
-              itemBuilder: (ctx, i) =>
-                  _buildAthleteAssessmentRow(athletes[i], i),
             ),
           ),
         ],
@@ -1774,19 +2032,23 @@ class _AwardPointsViewState extends State<AwardPointsView>
                         width: 18,
                         height: 18,
                         child: CircularProgressIndicator(
-                            color: Colors.white, strokeWidth: 2))
+                          color: Colors.white,
+                          strokeWidth: 2,
+                        ),
+                      )
                     : const Icon(Icons.save_rounded, color: Colors.white),
                 label: Text(
                   _isBulkSaving
                       ? 'Saving…'
                       : dirtyCount == 1
-                          ? 'Save 1 Assessment'
-                          : 'Save $dirtyCount Assessments',
+                      ? 'Save 1 Assessment'
+                      : 'Save $dirtyCount Assessments',
                   style: GoogleFonts.spaceGrotesk(
-                      color: Colors.white,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.6),
+                    color: Colors.white,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.6,
+                  ),
                 ),
               ),
             )
@@ -1800,102 +2062,104 @@ class _AwardPointsViewState extends State<AwardPointsView>
             SafeArea(
               child: Column(
                 children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(24, 12, 24, 0),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const SizedBox(width: 48),
-                    Text(
-                      'AWARD POINTS',
-                      style: GoogleFonts.spaceGrotesk(
-                          color: Colors.white,
-                          fontSize: 22,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 1.5),
-                    ),
-                    const SizedBox(width: 48),
-                  ],
-                ),
-              ).animate().fade(duration: 400.ms).slideX(
-                  begin: -0.1, curve: Curves.easeOutCubic),
+                  Padding(
+                        padding: const EdgeInsets.fromLTRB(24, 12, 24, 0),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const SizedBox(width: 48),
+                            Text(
+                              'AWARD POINTS',
+                              style: GoogleFonts.spaceGrotesk(
+                                color: Colors.white,
+                                fontSize: 22,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 1.5,
+                              ),
+                            ),
+                            const SizedBox(width: 48),
+                          ],
+                        ),
+                      )
+                      .animate()
+                      .fade(duration: 400.ms)
+                      .slideX(begin: -0.1, curve: Curves.easeOutCubic),
 
-              const SizedBox(height: 16),
+                  const SizedBox(height: 16),
 
-              Container(
-                margin: const EdgeInsets.symmetric(horizontal: 24),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.06),
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.08),
-                  ),
-                ),
-                child: TabBar(
-                  controller: _tabController,
-                  indicator: BoxDecoration(
-                    color: const Color(0xFF00A1FF).withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color:
-                          const Color(0xFF00A1FF).withValues(alpha: 0.5),
-                    ),
-                  ),
-                  indicatorSize: TabBarIndicatorSize.tab,
-                  dividerColor: Colors.transparent,
-                  labelColor: Colors.white,
-                  unselectedLabelColor: Colors.white54,
-                  labelStyle: GoogleFonts.spaceGrotesk(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 0.8,
-                  ),
-                  unselectedLabelStyle: GoogleFonts.spaceGrotesk(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 0.8,
-                  ),
-                  labelPadding: EdgeInsets.zero,
-                  padding: const EdgeInsets.all(4),
-                  tabs: const [
-                    Tab(
-                      height: 38,
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.edit_note_rounded, size: 18),
-                          SizedBox(width: 6),
-                          Text('Manual Ratings'),
-                        ],
+                  Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 24),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.06),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.08),
                       ),
                     ),
-                    Tab(
-                      height: 38,
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.speed_rounded, size: 18),
-                          SizedBox(width: 6),
-                          Text('Assessments'),
-                        ],
+                    child: TabBar(
+                      controller: _tabController,
+                      indicator: BoxDecoration(
+                        color: const Color(0xFF00A1FF).withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: const Color(0xFF00A1FF).withValues(alpha: 0.5),
+                        ),
                       ),
+                      indicatorSize: TabBarIndicatorSize.tab,
+                      dividerColor: Colors.transparent,
+                      labelColor: Colors.white,
+                      unselectedLabelColor: Colors.white54,
+                      labelStyle: GoogleFonts.spaceGrotesk(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.8,
+                      ),
+                      unselectedLabelStyle: GoogleFonts.spaceGrotesk(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0.8,
+                      ),
+                      labelPadding: EdgeInsets.zero,
+                      padding: const EdgeInsets.all(4),
+                      tabs: const [
+                        Tab(
+                          height: 38,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.edit_note_rounded, size: 18),
+                              SizedBox(width: 6),
+                              Text('Subjective'),
+                            ],
+                          ),
+                        ),
+                        Tab(
+                          height: 38,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.speed_rounded, size: 18),
+                              SizedBox(width: 6),
+                              Text('Objective'),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
-              ),
+                  ),
 
-              const SizedBox(height: 8),
+                  const SizedBox(height: 8),
 
-              Expanded(
-                child: TabBarView(
-                  controller: _tabController,
-                  physics: const BouncingScrollPhysics(),
-                  children: [
-                    _buildManualRatingsBody(),
-                    _buildAssessmentsBody(),
-                  ],
-                ),
-              ),
+                  Expanded(
+                    child: TabBarView(
+                      controller: _tabController,
+                      physics: const BouncingScrollPhysics(),
+                      children: [
+                        _buildManualRatingsBody(),
+                        _buildAssessmentsBody(),
+                      ],
+                    ),
+                  ),
                 ],
               ),
             ),

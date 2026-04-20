@@ -1,6 +1,7 @@
 import 'package:get/get.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../core/services/notification_service.dart';
 import '../../data/models/user_model.dart';
 import '../../routes/app_routes.dart';
 
@@ -20,6 +21,9 @@ class SplashController extends GetxController {
       try {
         final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
         if (doc.exists && doc.data() != null) {
+          // Fire-and-forget: register FCM token for push notifications
+          NotificationService().requestPermissionAndSaveToken(user.uid);
+
           final role = doc.data()!['role'] as String?;
           final schoolId = doc.data()!['schoolId'] as String?;
           final teamId = doc.data()!['teamId'] as String?;
@@ -42,7 +46,11 @@ class SplashController extends GetxController {
             Get.offAllNamed(Routes.INVITE_CODE);
           }
         } else {
-          Get.offAllNamed(Routes.INVITE_CODE);
+          // Auth user exists but Firestore doc is missing (rare crash between
+          // Auth creation and Firestore write). Sign out so the user can
+          // re-register cleanly without hitting "email already in use".
+          await FirebaseAuth.instance.signOut();
+          Get.offAllNamed(Routes.AUTH);
         }
       } catch (e) {
         Get.offAllNamed(Routes.AUTH);

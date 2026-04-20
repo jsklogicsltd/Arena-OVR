@@ -39,6 +39,8 @@ class AdminController extends GetxController {
   // Form Controllers for Create School
   final nameController = TextEditingController();
   final emailController = TextEditingController();
+  final maxTeamsController = TextEditingController(text: '3');
+  final maxAthletesController = TextEditingController(text: '60');
   final expiryDate = Rx<DateTime?>(
     DateTime.now().add(const Duration(days: 365)),
   );
@@ -261,6 +263,8 @@ class AdminController extends GetxController {
     }
     nameController.dispose();
     emailController.dispose();
+    maxTeamsController.dispose();
+    maxAthletesController.dispose();
     super.onClose();
   }
 
@@ -315,6 +319,9 @@ class AdminController extends GetxController {
         logoUrl = await storageRef.getDownloadURL();
       }
 
+      final maxTeams = int.tryParse(maxTeamsController.text.trim()) ?? 3;
+      final maxAthletes = int.tryParse(maxAthletesController.text.trim()) ?? 60;
+
       final school = SchoolModel(
         id: docId,
         name: name,
@@ -324,12 +331,16 @@ class AdminController extends GetxController {
         expiryDate: expiryDate.value,
         createdAt: DateTime.now(),
         logoUrl: logoUrl,
+        maxTeamsLimit: maxTeams.clamp(1, 100),
+        maxAthletesLimit: maxAthletes.clamp(1, 9999),
       );
 
       await _schoolRepo.createSchool(school);
 
       nameController.clear();
       emailController.clear();
+      maxTeamsController.text = '3';
+      maxAthletesController.text = '60';
       selectedSchoolLogo.value = null;
       expiryDate.value = DateTime.now().add(const Duration(days: 365));
 
@@ -354,6 +365,8 @@ class AdminController extends GetxController {
     generatedSchoolCode.value = '';
     nameController.clear();
     emailController.clear();
+    maxTeamsController.text = '3';
+    maxAthletesController.text = '60';
     selectedSchoolLogo.value = null;
     expiryDate.value = DateTime.now().add(const Duration(days: 365));
   }
@@ -421,6 +434,102 @@ class AdminController extends GetxController {
         backgroundColor: Colors.red.withValues(alpha: 0.8),
         colorText: Colors.white,
       );
+    }
+  }
+
+  final isUpdatingLimits = false.obs;
+
+  /// Updates [maxTeamsLimit] and [maxAthletesLimit] for a school.
+  ///
+  /// Validates that:
+  /// - Both values are positive integers.
+  /// - New team limit is not below the current number of active teams.
+  /// - New athlete limit is not below the current number of enrolled athletes.
+  Future<void> updateSchoolLimits({
+    required String schoolId,
+    required int newMaxTeams,
+    required int newMaxAthletes,
+  }) async {
+    // Basic range guard.
+    if (newMaxTeams < 1 || newMaxAthletes < 1) {
+      Get.snackbar(
+        'Invalid Values',
+        'Limits must be positive integers greater than zero.',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.red.withValues(alpha: 0.8),
+        colorText: Colors.white,
+      );
+      return;
+    }
+
+    isUpdatingLimits.value = true;
+    try {
+      // Count current teams so we never set a limit below live usage.
+      final teamsSnap = await _firestore
+          .collection('teams')
+          .where('schoolId', isEqualTo: schoolId)
+          .count()
+          .get();
+      final currentTeams = teamsSnap.count ?? 0;
+
+      // Count current athletes across all teams in this school.
+      final athletesSnap = await _firestore
+          .collection('users')
+          .where('schoolId', isEqualTo: schoolId)
+          .where('role', isEqualTo: 'athlete')
+          .count()
+          .get();
+      final currentAthletes = athletesSnap.count ?? 0;
+
+      if (newMaxTeams < currentTeams) {
+        Get.snackbar(
+          'Cannot Reduce Limit',
+          'This school already has $currentTeams teams. '
+          'Set a limit of $currentTeams or higher.',
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.orange.withValues(alpha: 0.9),
+          colorText: Colors.white,
+          duration: const Duration(seconds: 4),
+        );
+        return;
+      }
+
+      if (newMaxAthletes < currentAthletes) {
+        Get.snackbar(
+          'Cannot Reduce Limit',
+          'This school already has $currentAthletes athletes enrolled. '
+          'Set a limit of $currentAthletes or higher.',
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.orange.withValues(alpha: 0.9),
+          colorText: Colors.white,
+          duration: const Duration(seconds: 4),
+        );
+        return;
+      }
+
+      await _firestore.collection('schools').doc(schoolId).update({
+        'maxTeamsLimit': newMaxTeams,
+        'maxAthletesLimit': newMaxAthletes,
+      });
+
+      Get.snackbar(
+        'Limits Updated',
+        'The school can now add up to $newMaxTeams teams and $newMaxAthletes athletes.',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.green.withValues(alpha: 0.85),
+        colorText: Colors.white,
+        duration: const Duration(seconds: 4),
+      );
+    } catch (e) {
+      Get.snackbar(
+        'Error',
+        'Failed to update limits: $e',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.red.withValues(alpha: 0.8),
+        colorText: Colors.white,
+      );
+    } finally {
+      isUpdatingLimits.value = false;
     }
   }
 

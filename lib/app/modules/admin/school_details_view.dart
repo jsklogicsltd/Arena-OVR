@@ -14,14 +14,47 @@ import '../../data/models/school_model.dart';
 import '../../data/models/user_model.dart';
 import 'admin_controller.dart';
 
-class SchoolDetailsView extends StatelessWidget {
+class SchoolDetailsView extends StatefulWidget {
   const SchoolDetailsView({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final schoolArg = Get.arguments;
+  State<SchoolDetailsView> createState() => _SchoolDetailsViewState();
+}
 
-    if (schoolArg == null || schoolArg is! SchoolModel) {
+class _SchoolDetailsViewState extends State<SchoolDetailsView> {
+  late final SchoolModel school;
+  late final AdminController adminCtrl;
+  late final TextEditingController _maxTeamsCtrl;
+  late final TextEditingController _maxAthletesCtrl;
+  bool _schoolArgValid = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final arg = Get.arguments;
+    if (arg is SchoolModel) {
+      school = arg;
+      adminCtrl = Get.find<AdminController>();
+      _maxTeamsCtrl =
+          TextEditingController(text: school.maxTeamsLimit.toString());
+      _maxAthletesCtrl =
+          TextEditingController(text: school.maxAthletesLimit.toString());
+      _schoolArgValid = true;
+    }
+  }
+
+  @override
+  void dispose() {
+    if (_schoolArgValid) {
+      _maxTeamsCtrl.dispose();
+      _maxAthletesCtrl.dispose();
+    }
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_schoolArgValid) {
       return Scaffold(
         backgroundColor: Colors.transparent,
         body: StadiumBackground(
@@ -50,9 +83,6 @@ class SchoolDetailsView extends StatelessWidget {
         ),
       );
     }
-
-    final SchoolModel school = schoolArg;
-    final AdminController adminCtrl = Get.find<AdminController>();
 
     final bool isExpiring =
         school.expiryDate != null &&
@@ -336,6 +366,135 @@ class SchoolDetailsView extends StatelessWidget {
                         ),
                       ).animate(delay: 600.ms).fade(duration: 800.ms, curve: Curves.easeOutCubic).slideY(begin: 0.1),
 
+                      const SizedBox(height: 16),
+
+                      // Subscription Limits — editable
+                      GlassCard(
+                        backgroundColor: Colors.white.withValues(alpha: 0.05),
+                        padding: const EdgeInsets.all(24),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Section header
+                            Row(
+                              children: [
+                                const Icon(
+                                  Icons.tune_rounded,
+                                  color: Color(0xFF00A1FF),
+                                  size: 16,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'SUBSCRIPTION LIMITS',
+                                  style: GoogleFonts.spaceGrotesk(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                    color: Colors.white54,
+                                    letterSpacing: 2.0,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 20),
+                            // Two input fields side-by-side
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _buildLimitField(
+                                    label: 'MAX TEAMS',
+                                    icon: Icons.groups_outlined,
+                                    color: const Color(0xFF00A1FF),
+                                    controller: _maxTeamsCtrl,
+                                  ),
+                                ),
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  child: _buildLimitField(
+                                    label: 'MAX ATHLETES',
+                                    icon: Icons.directions_run_rounded,
+                                    color: const Color(0xFF39FF14),
+                                    controller: _maxAthletesCtrl,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 20),
+                            // Save button
+                            Obx(() {
+                              final saving = adminCtrl.isUpdatingLimits.value;
+                              return SizedBox(
+                                width: double.infinity,
+                                height: 48,
+                                child: ElevatedButton.icon(
+                                  onPressed: saving
+                                      ? null
+                                      : () {
+                                          final newTeams = int.tryParse(
+                                            _maxTeamsCtrl.text.trim(),
+                                          );
+                                          final newAthletes = int.tryParse(
+                                            _maxAthletesCtrl.text.trim(),
+                                          );
+                                          if (newTeams == null ||
+                                              newAthletes == null ||
+                                              newTeams < 1 ||
+                                              newAthletes < 1) {
+                                            Get.snackbar(
+                                              'Invalid Input',
+                                              'Please enter positive whole numbers for both limits.',
+                                              snackPosition:
+                                                  SnackPosition.BOTTOM,
+                                              backgroundColor: Colors.red
+                                                  .withValues(alpha: 0.8),
+                                              colorText: Colors.white,
+                                            );
+                                            return;
+                                          }
+                                          adminCtrl.updateSchoolLimits(
+                                            schoolId: school.id,
+                                            newMaxTeams: newTeams,
+                                            newMaxAthletes: newAthletes,
+                                          );
+                                        },
+                                  icon: saving
+                                      ? const SizedBox(
+                                          width: 16,
+                                          height: 16,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            color: Colors.white,
+                                          ),
+                                        )
+                                      : const Icon(
+                                          Icons.save_rounded,
+                                          size: 18,
+                                        ),
+                                  label: Text(
+                                    saving ? 'SAVING...' : 'SAVE CHANGES',
+                                    style: GoogleFonts.spaceGrotesk(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w700,
+                                      letterSpacing: 0.8,
+                                    ),
+                                  ),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFF00A1FF),
+                                    foregroundColor: Colors.white,
+                                    disabledBackgroundColor:
+                                        const Color(0xFF00A1FF)
+                                            .withValues(alpha: 0.4),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    elevation: 0,
+                                  ),
+                                ),
+                              );
+                            }),
+                          ],
+                        ),
+                      ).animate(delay: 650.ms).fade(duration: 800.ms, curve: Curves.easeOutCubic).slideY(begin: 0.1),
+
                       const SizedBox(height: 32),
 
                       // ── COACHES LIST ──
@@ -580,6 +739,65 @@ class SchoolDetailsView extends StatelessWidget {
           fontSize: 15,
         ),
       ),
+    );
+  }
+
+  Widget _buildLimitField({
+    required String label,
+    required IconData icon,
+    required Color color,
+    required TextEditingController controller,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(icon, color: color, size: 14),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: GoogleFonts.spaceGrotesk(
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+                color: Colors.white54,
+                letterSpacing: 0.8,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.05),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: color.withValues(alpha: 0.3)),
+          ),
+          child: TextField(
+            controller: controller,
+            keyboardType: TextInputType.number,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            textAlign: TextAlign.center,
+            style: GoogleFonts.spaceGrotesk(
+              color: color,
+              fontSize: 22,
+              fontWeight: FontWeight.w800,
+            ),
+            decoration: InputDecoration(
+              border: InputBorder.none,
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 12,
+              ),
+              hintText: '0',
+              hintStyle: GoogleFonts.spaceGrotesk(
+                color: Colors.white24,
+                fontSize: 22,
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 

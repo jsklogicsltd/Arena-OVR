@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:image_picker/image_picker.dart';
+import '../../core/utils/firebase_auth_messages.dart';
 import '../../data/repositories/auth_repository.dart';
 import '../../routes/app_routes.dart';
 
@@ -151,6 +152,7 @@ class SignupController extends GetxController {
       if (roleDbValue == 'athlete') {
         userData['ovr'] = 50;
         userData['actualOvr'] = 50;
+        userData['finalOvr'] = 50;
         userData['ovrDay'] = null;
         userData['ovrCap'] = null;
       }
@@ -168,11 +170,36 @@ class SignupController extends GetxController {
       } else {
         Get.offAllNamed(Routes.INVITE_CODE);
       }
-    } catch (e) {
-      Get.snackbar('Signup Failed', e.toString(),
+    } on FirebaseAuthException catch (e) {
+      if (e.code == 'email-already-in-use') {
+        Get.snackbar(
+          'Already Registered',
+          'This email is already registered. Please log in to complete your setup.',
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.orange.withOpacity(0.9),
+          colorText: Colors.white,
+          duration: const Duration(seconds: 4),
+        );
+        Future.delayed(const Duration(milliseconds: 600), () {
+          Get.offAllNamed(Routes.AUTH);
+        });
+      } else {
+        Get.snackbar(
+          'Signup Failed',
+          firebaseAuthUserMessage(e),
           snackPosition: SnackPosition.BOTTOM,
           backgroundColor: Colors.red.withOpacity(0.8),
-          colorText: Colors.white);
+          colorText: Colors.white,
+        );
+      }
+    } catch (_) {
+      Get.snackbar(
+        'Signup Failed',
+        'An unexpected error occurred. Please try again later.',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.red.withOpacity(0.8),
+        colorText: Colors.white,
+      );
     } finally {
       isLoading.value = false;
     }

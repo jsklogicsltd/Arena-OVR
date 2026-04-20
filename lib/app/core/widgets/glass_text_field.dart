@@ -9,6 +9,12 @@ class GlassTextField extends StatefulWidget {
   final bool isPassword;
   final TextEditingController? controller;
   final FocusNode? focusNode;
+  final TextInputType keyboardType;
+  final TextInputAction? textInputAction;
+  final TextCapitalization textCapitalization;
+  final Iterable<String>? autofillHints;
+  final bool? enableSuggestions;
+  final bool? autocorrect;
 
   const GlassTextField({
     super.key,
@@ -17,6 +23,12 @@ class GlassTextField extends StatefulWidget {
     this.isPassword = false,
     this.controller,
     this.focusNode,
+    this.keyboardType = TextInputType.text,
+    this.textInputAction,
+    this.textCapitalization = TextCapitalization.none,
+    this.autofillHints,
+    this.enableSuggestions,
+    this.autocorrect,
   });
 
   @override
@@ -79,6 +91,13 @@ class _GlassTextFieldState extends State<GlassTextField> {
             controller: widget.controller,
             focusNode: _focusNode,
             obscureText: _obscureText,
+            keyboardType: widget.keyboardType,
+            textInputAction: widget.textInputAction,
+            textCapitalization: widget.textCapitalization,
+            autofillHints: widget.autofillHints,
+            enableSuggestions:
+                widget.enableSuggestions ?? (widget.isPassword ? false : true),
+            autocorrect: widget.autocorrect ?? (widget.isPassword ? false : true),
             style: const TextStyle(color: AppColors.textPrimary),
             decoration: InputDecoration(
               hintText: widget.hintText,

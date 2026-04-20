@@ -29,6 +29,10 @@ class _CreateTeamViewState extends State<CreateTeamView> {
   final CoachController controller = Get.find<CoachController>();
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _customSportController = TextEditingController();
+  final TextEditingController _seasonLengthController =
+      TextEditingController(text: '15');
+  final TextEditingController _startingBaselineController =
+      TextEditingController(text: '50');
 
   final List<String> _standardSports = const [
     'FOOTBALL',
@@ -68,6 +72,8 @@ class _CreateTeamViewState extends State<CreateTeamView> {
   void dispose() {
     _nameController.dispose();
     _customSportController.dispose();
+    _seasonLengthController.dispose();
+    _startingBaselineController.dispose();
     super.dispose();
   }
 
@@ -147,6 +153,9 @@ class _CreateTeamViewState extends State<CreateTeamView> {
     }
 
     final sportLabel = _resolvedSport();
+    final seasonLengthDays = int.tryParse(_seasonLengthController.text.trim());
+    final startingBaseline =
+        int.tryParse(_startingBaselineController.text.trim());
     if (sportLabel.isEmpty) {
       Get.snackbar(
         'Error',
@@ -156,6 +165,16 @@ class _CreateTeamViewState extends State<CreateTeamView> {
       );
       return;
     }
+    if (seasonLengthDays == null || seasonLengthDays < 7) {
+      Get.snackbar('Error', 'Season length must be at least 7 days');
+      return;
+    }
+    if (startingBaseline == null ||
+        startingBaseline < 0 ||
+        startingBaseline > 90) {
+      Get.snackbar('Error', 'Starting OVR baseline must be between 0 and 90');
+      return;
+    }
 
     setState(() => isLoading = true);
 
@@ -163,6 +182,62 @@ class _CreateTeamViewState extends State<CreateTeamView> {
       final uid = FirebaseAuth.instance.currentUser!.uid;
       final userDoc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
       final schoolId = userDoc.data()?['schoolId'] ?? 'UNKNOWN_SCHOOL';
+
+      // ── Team-limit guard ──────────────────────────────────────────────
+      final schoolDoc = await FirebaseFirestore.instance
+          .collection('schools')
+          .doc(schoolId)
+          .get();
+      final maxTeams =
+          (schoolDoc.data()?['maxTeamsLimit'] as num?)?.toInt() ?? 3;
+      final existingTeams = await FirebaseFirestore.instance
+          .collection('teams')
+          .where('schoolId', isEqualTo: schoolId)
+          .count()
+          .get();
+      if ((existingTeams.count ?? 0) >= maxTeams) {
+        setState(() => isLoading = false);
+        if (!mounted) return;
+        showDialog(
+          context: context,
+          builder: (_) => AlertDialog(
+            backgroundColor: const Color(0xFF1A1A2E),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            title: Text(
+              'Team Limit Reached',
+              style: GoogleFonts.spaceGrotesk(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            content: Text(
+              'Your school has reached the maximum of $maxTeams teams. '
+              'Contact your administrator to upgrade your school\'s plan.',
+              style: GoogleFonts.spaceGrotesk(
+                color: Colors.white70,
+                fontSize: 14,
+                height: 1.5,
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: Text(
+                  'OK',
+                  style: GoogleFonts.spaceGrotesk(
+                    color: const Color(0xFF00A1FF),
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+        return;
+      }
+      // ── End team-limit guard ──────────────────────────────────────────
 
       final newTeam = TeamModel(
         id: '',
@@ -174,6 +249,8 @@ class _CreateTeamViewState extends State<CreateTeamView> {
         customTags: const [],
         primaryColor: '#${primaryColor.value.toRadixString(16).substring(2).toUpperCase()}',
         secondaryColor: '#${secondaryColor.value.toRadixString(16).substring(2).toUpperCase()}',
+        seasonLengthDays: seasonLengthDays,
+        startingOvrBaseline: startingBaseline,
         createdBy: uid,
       );
 
@@ -696,6 +773,59 @@ class _CreateTeamViewState extends State<CreateTeamView> {
 
                             const SizedBox(height: 32),
 
+                            Text('SEASON SETUP', style: GoogleFonts.spaceGrotesk(color: Colors.white54, fontSize: 10, letterSpacing: 1.5, fontWeight: FontWeight.bold))
+                                .animate(delay: 700.ms).fade(duration: 800.ms, curve: Curves.easeOutQuint),
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      color: const Color(0x800A0E1A),
+                                      borderRadius: BorderRadius.circular(16),
+                                    ),
+                                    child: TextField(
+                                      controller: _seasonLengthController,
+                                      keyboardType: TextInputType.number,
+                                      style: GoogleFonts.inter(color: Colors.white, fontSize: 16),
+                                      decoration: InputDecoration(
+                                        labelText: 'Length (days)',
+                                        hintText: 'Min 7',
+                                        labelStyle: GoogleFonts.inter(color: Colors.white54),
+                                        hintStyle: GoogleFonts.inter(color: Colors.white24),
+                                        border: InputBorder.none,
+                                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      color: const Color(0x800A0E1A),
+                                      borderRadius: BorderRadius.circular(16),
+                                    ),
+                                    child: TextField(
+                                      controller: _startingBaselineController,
+                                      keyboardType: TextInputType.number,
+                                      style: GoogleFonts.inter(color: Colors.white, fontSize: 16),
+                                      decoration: InputDecoration(
+                                        labelText: 'Starting OVR',
+                                        hintText: '0 - 90',
+                                        labelStyle: GoogleFonts.inter(color: Colors.white54),
+                                        hintStyle: GoogleFonts.inter(color: Colors.white24),
+                                        border: InputBorder.none,
+                                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ).animate(delay: 725.ms).fade(duration: 800.ms, curve: Curves.easeOutQuint).slideY(begin: 0.1, curve: Curves.easeOutQuint),
+
+                            const SizedBox(height: 32),
+
                             // POSITION GROUPS
                             Text('POSITION GROUPS', style: GoogleFonts.spaceGrotesk(color: Colors.white54, fontSize: 10, letterSpacing: 1.5, fontWeight: FontWeight.bold))
                                 .animate(delay: 600.ms).fade(duration: 800.ms, curve: Curves.easeOutQuint),
@@ -812,7 +942,8 @@ class _CreateTeamViewState extends State<CreateTeamView> {
                           width: double.infinity,
                           padding: const EdgeInsets.symmetric(vertical: 20),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF8B6B0D),
+                            // Match the bright gold used across the coach UI (Award / tier gold).
+                            color: AppColors.tierGold,
                             borderRadius: BorderRadius.circular(24),
                           ),
                           child: isLoading 

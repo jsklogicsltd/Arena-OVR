@@ -51,7 +51,7 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyDvBRImg4obfJV2qUksw9v64HcWAGzFLG0',
-    appId: '1:533126310016:android:56dd4dac53ff2b96865e65',
+    appId: '1:533126310016:android:0da254a34f044326865e65',
     messagingSenderId: '533126310016',
     projectId: 'arena-ovr',
     storageBucket: 'arena-ovr.firebasestorage.app',
@@ -59,10 +59,11 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions ios = FirebaseOptions(
     apiKey: 'AIzaSyAWz8QP_n1YJDWOpch58VsSVuQzk1p1y9A',
-    appId: '1:533126310016:ios:02ad8d31f5c6dc46865e65',
+    appId: '1:533126310016:ios:7cfda0e1b93dd54c865e65',
     messagingSenderId: '533126310016',
     projectId: 'arena-ovr',
     storageBucket: 'arena-ovr.firebasestorage.app',
-    iosBundleId: 'com.example.arenaOvr',
+    iosBundleId: 'com.arenaovr.scoreapp',
   );
+
 }

@@ -158,7 +158,7 @@ class SettingsView extends GetView<SettingsController> {
                         const SizedBox(height: 20),
                         _buildSectionLabel('ACCOUNT'),
                         const SizedBox(height: 8),
-                        _buildAccountCard(),
+                        _buildAccountCard(context),
                         const SizedBox(height: 20),
                         _buildSectionLabel('DANGER ZONE', isDanger: true),
                         const SizedBox(height: 8),
@@ -715,10 +715,10 @@ class SettingsView extends GetView<SettingsController> {
     );
   }
 
-  Widget _buildAccountCard() {
+  Widget _buildAccountCard(BuildContext context) {
     return _buildGlassCard(
       children: [
-        _buildActionRow('Change Password', Icons.chevron_right_rounded, controller.changePassword),
+        _buildActionRow('Change Password', Icons.chevron_right_rounded, () => controller.changePassword(context)),
         Divider(height: 24, color: Colors.white.withValues(alpha: 0.1)),
         _buildActionRow('Log Out', Icons.logout_rounded, () {
           try {

@@ -10,8 +10,9 @@ import '../player_controller.dart';
 import '../../coach/coach_controller.dart';
 import '../../leaderboard/leaderboard_controller.dart';
 import '../../../core/constants/app_colors.dart';
-import '../../../core/widgets/fire_sparks_background.dart';
 import '../../../core/widgets/periodic_shimmer_bar.dart';
+import '../../../core/widgets/badge_trophy_case.dart';
+import '../../../core/utils/elite_ovr_style.dart';
 import '../../../data/models/user_model.dart';
 import '../../../data/models/transaction_model.dart';
 import '../../../data/repositories/rating_repository.dart';
@@ -80,7 +81,7 @@ class _AthleteProfileViewState extends State<AthleteProfileView>
   void _setupBarAnims(UserModel a) {
     const maxScore = 100.0;
     final r   = a.currentRating;
-    final ath = ((r['Athlete']  ?? r['Performance'] ?? 0) as num).toDouble();
+    final ath = ((r['Athlete']  ?? r['Competitor'] ?? r['Performance'] ?? 0) as num).toDouble();
     final stu = ((r['Student']  ?? r['Class']       ?? 0) as num).toDouble();
     final tm  = ((r['Teammate'] ?? r['Program']     ?? 0) as num).toDouble();
     final cit = ((r['Citizen']  ?? r['Standard']    ?? 0) as num).toDouble();
@@ -178,7 +179,7 @@ class _AthleteProfileViewState extends State<AthleteProfileView>
   Widget _buildBody(PlayerController? c) {
     final athlete = _athlete!;
     final r       = athlete.currentRating;
-    final ath     = ((r['Athlete']  ?? r['Performance'] ?? 0) as num).toInt();
+    final ath     = ((r['Athlete']  ?? r['Competitor'] ?? r['Performance'] ?? 0) as num).toInt();
     final stu     = ((r['Student']  ?? r['Class']       ?? 0) as num).toInt();
     final tm      = ((r['Teammate'] ?? r['Program']     ?? 0) as num).toInt();
     final cit     = ((r['Citizen']  ?? r['Standard']    ?? 0) as num).toInt();
@@ -339,7 +340,7 @@ class _AthleteProfileViewState extends State<AthleteProfileView>
                         children: [
                           _buildPlayerPhoto(athlete),
                           const SizedBox(width: 20),
-                          Expanded(child: _buildPlayerInfo(athlete)),
+                          Expanded(child: _buildPlayerInfo(athlete, c)),
                         ],
                       ),
                       const SizedBox(height: 16),
@@ -434,6 +435,7 @@ class _AthleteProfileViewState extends State<AthleteProfileView>
 
   Widget _buildPlayerPhoto(UserModel athlete) {
     const borderColor = AppColors.seasonGold;
+    final elite = EliteOvrStyle.isEliteOvr(athlete.coachVisibleOvr);
     return Container(
       width: 120,
       height: 170,
@@ -447,18 +449,21 @@ class _AthleteProfileViewState extends State<AthleteProfileView>
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(14),
-        child: athlete.profilePicUrl != null
-            ? CachedNetworkImage(
-                imageUrl: athlete.profilePicUrl!,
-                fit: BoxFit.cover,
-                placeholder: (_, __) => Container(
-                  color: const Color(0xFF0F1923),
-                  child: Icon(Icons.person_rounded,
-                      color: borderColor.withOpacity(0.5), size: 48),
-                ),
-                errorWidget: (_, __, ___) => _photoPlaceholder(borderColor),
-              )
-            : _photoPlaceholder(borderColor),
+        child: EliteOvrStyle.tintedAvatar(
+          isElite: elite,
+          child: athlete.profilePicUrl != null
+              ? CachedNetworkImage(
+                  imageUrl: athlete.profilePicUrl!,
+                  fit: BoxFit.cover,
+                  placeholder: (_, __) => Container(
+                    color: const Color(0xFF0F1923),
+                    child: Icon(Icons.person_rounded,
+                        color: borderColor.withOpacity(0.5), size: 48),
+                  ),
+                  errorWidget: (_, __, ___) => _photoPlaceholder(borderColor),
+                )
+              : _photoPlaceholder(borderColor),
+        ),
       ),
     );
   }
@@ -475,10 +480,17 @@ class _AthleteProfileViewState extends State<AthleteProfileView>
     );
   }
 
-  Widget _buildPlayerInfo(UserModel athlete) {
-    final c    = widget.isOwnProfile ? Get.find<PlayerController>() : null;
-    final shownOvr = widget.isOwnProfile ? (c?.displayedOvr ?? 0) : athlete.coachVisibleOvr;
-    final isOvrHidden = widget.isOwnProfile && (c?.displayedOvr == null);
+  Widget _buildPlayerInfo(UserModel athlete, PlayerController? c) {
+    final shownOvr = widget.isOwnProfile
+        ? (c?.displayedOvr ?? 0)
+        : athlete.coachVisibleOvr;
+    // Match athlete dashboard: ??? only after season/team streams resolved (not while loading).
+    final isOvrHidden = widget.isOwnProfile &&
+        c != null &&
+        c.isOvrDisplayResolved &&
+        c.displayedOvr == null;
+    final showOvrLoading =
+        widget.isOwnProfile && c != null && !c.isOvrDisplayResolved;
     String teamName;
     if (widget.isOwnProfile && c != null) {
       teamName = c.team.value?.name ?? '—';
@@ -566,7 +578,41 @@ class _AthleteProfileViewState extends State<AthleteProfileView>
         ),
         const SizedBox(height: 14),
         // OVR Number + label
-        if (isOvrHidden)
+        if (showOvrLoading)
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SizedBox(
+                height: 52,
+                width: 52,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2.5,
+                  color: AppColors.tierGold.withValues(alpha: 0.9),
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                'SYNCING OVR…',
+                style: GoogleFonts.spaceGrotesk(
+                  color: AppColors.textSecondary,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.8,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'FINAL OVR (50/50 CURVE)',
+                style: GoogleFonts.spaceGrotesk(
+                  color: AppColors.seasonGold,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 1.2,
+                ),
+              ),
+            ],
+          )
+        else if (isOvrHidden)
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -580,7 +626,7 @@ class _AthleteProfileViewState extends State<AthleteProfileView>
               ),
               const SizedBox(height: 4),
               Text(
-                'OVR RATING',
+                'FINAL OVR (50/50 CURVE)',
                 style: GoogleFonts.spaceGrotesk(
                   color: AppColors.seasonGold,
                   fontSize: 11,
@@ -615,7 +661,7 @@ class _AthleteProfileViewState extends State<AthleteProfileView>
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'OVR RATING',
+                  'FINAL OVR (50/50 CURVE)',
                   style: GoogleFonts.spaceGrotesk(
                     color: AppColors.seasonGold,
                     fontSize: 11,
@@ -641,7 +687,7 @@ class _AthleteProfileViewState extends State<AthleteProfileView>
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        _buildStatCard('ATHLETE',   ath, athPct, AppColors.primary),
+        _buildStatCard('COMPETITOR',   ath, athPct, AppColors.primary),
         const SizedBox(height: 8),
         _buildStatCard('STUDENT',   stu, stuPct, AppColors.positive),
         const SizedBox(height: 8),
@@ -723,73 +769,7 @@ class _AthleteProfileViewState extends State<AthleteProfileView>
   // ── Achievements ──────────────────────────────────────────────────────────────
 
   Widget _buildAchievements(List<String> badges) {
-    const defs = [
-      _BadgeDef(key: 'rising_star', label: 'Rising Star',  icon: Icons.star_rounded,          color: AppColors.tierGold),
-      _BadgeDef(key: 'team_player', label: 'Team Player',  icon: Icons.handshake_rounded,     color: AppColors.positive),
-      _BadgeDef(key: 'mvp',         label: 'MVP',          icon: Icons.military_tech_rounded,  color: AppColors.primary),
-      _BadgeDef(key: 'iron_man',    label: 'Iron Man',     icon: Icons.shield_rounded,         color: Color(0xFF9B30FF)),
-    ];
-
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(16),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
-          children: defs.asMap().entries.map((e) {
-            final bd       = e.value;
-            final unlocked = badges.contains(bd.key);
-            return Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 58,
-                  height: 58,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: unlocked
-                        ? bd.color.withOpacity(0.18)
-                        : Colors.white.withOpacity(0.04),
-                    border: Border.all(
-                      color: unlocked
-                          ? bd.color.withOpacity(0.55)
-                          : Colors.white.withOpacity(0.10),
-                      width: 1.5,
-                    ),
-                    boxShadow: unlocked
-                        ? [
-                            BoxShadow(
-                                color: bd.color.withOpacity(0.28),
-                                blurRadius: 14)
-                          ]
-                        : null,
-                  ),
-                  child: Icon(
-                    unlocked ? bd.icon : Icons.lock_outline_rounded,
-                    color: unlocked ? bd.color : Colors.white24,
-                    size: 24,
-                  ),
-                )
-                    .animate(delay: Duration(milliseconds: 420 + e.key * 70))
-                    .scale(
-                        begin: const Offset(0.5, 0.5),
-                        duration: 500.ms,
-                        curve: Curves.elasticOut),
-                const SizedBox(height: 8),
-                Text(
-                  bd.label,
-                  style: GoogleFonts.spaceGrotesk(
-                      color: unlocked ? Colors.white60 : Colors.white24,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600),
-                  textAlign: TextAlign.center,
-                ),
-              ],
-            );
-          }).toList(),
-        ),
-      ),
-    );
+    return BadgeTrophyCase(earnedBadges: badges, badgeSize: 54);
   }
 
   // ── History ───────────────────────────────────────────────────────────────────
@@ -973,7 +953,8 @@ class _AthleteProfileViewState extends State<AthleteProfileView>
   String _catDisplay(String cat) {
     switch (cat.toLowerCase()) {
       case 'athlete':
-      case 'performance': return 'Athlete';
+      case 'competitor':
+      case 'performance': return 'Competitor';
       case 'student':
       case 'class':
       case 'classroom':   return 'Student';
@@ -989,7 +970,7 @@ class _AthleteProfileViewState extends State<AthleteProfileView>
     TransactionModel(
       id: '1', athleteId: uid, coachId: 'coach1',
       teamId: 'mock', schoolId: 'mock', seasonId: 'mock',
-      category: 'Athlete', value: 3,
+      category: 'Competitor', value: 3,
       note: 'Exceptional drive and accuracy on the final quarter.',
       type: 'RATING',
       createdAt: DateTime(2024, 10, 4),
@@ -1021,16 +1002,3 @@ class _AthleteProfileViewState extends State<AthleteProfileView>
   ];
 }
 
-// ── Badge definition ──────────────────────────────────────────────────────────
-
-class _BadgeDef {
-  final String key, label;
-  final IconData icon;
-  final Color color;
-  const _BadgeDef({
-    required this.key,
-    required this.label,
-    required this.icon,
-    required this.color,
-  });
-}
