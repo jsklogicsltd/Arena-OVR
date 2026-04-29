@@ -90,30 +90,35 @@ class RatingRepository {
       }
     }
 
-    for (var aId in stats.keys) {
-      stats[aId]!['ath'] = stats[aId]!['ath']!.clamp(0.0, 99.0);
-      stats[aId]!['stu'] = stats[aId]!['stu']!.clamp(0.0, 99.0);
-      stats[aId]!['tm'] = stats[aId]!['tm']!.clamp(0.0, 99.0);
-      stats[aId]!['cit'] = stats[aId]!['cit']!.clamp(0.0, 99.0);
-    }
+    // NOTE: Raw bucket totals are NOT clamped to 0..99 any more.
+    // The Top Dawg pre-pass needs the unclamped accumulation so the team
+    // leader in each category is identified correctly.
 
     final batch = _provider.firestore.batch();
     
     int totalOvr = 0;
     int ratedAthletes = 0;
 
+    // ── Top Dawg pre-pass: build roster-wide raw buckets ──────────────────
+    final rosterBucketRaw = <String, Map<String, double>>{};
+    for (var doc in athletesSnap.docs) {
+      final aId = doc.id;
+      rosterBucketRaw[aId] = {
+        'ath': stats[aId]!['ath']!,
+        'stu': stats[aId]!['stu']!,
+        'tm': stats[aId]!['tm']!,
+        'cit': stats[aId]!['cit']!,
+      };
+    }
+
+    final topDawgScores =
+        curve.computeTopDawgSubjectiveScores(rosterBucketRaw);
+
     for (var doc in athletesSnap.docs) {
       final aId = doc.id;
 
-      final ath = stats[aId]!['ath']!;
-      final stu = stats[aId]!['stu']!;
-      final tm = stats[aId]!['tm']!;
-      final cit = stats[aId]!['cit']!;
-
-      // Beta 3 locked rule: subjective/manual base is an equal-average
-      // across the four buckets (Competitor, Student, Teammate, Citizen).
-      final manualBase = ((ath + stu + tm + cit) / 4.0).clamp(0.0, 99.0);
-      final manualOvr = manualBase.round();
+      final buckets = topDawgScores[aId]!;
+      final manualOvr = buckets.manualOvr;
       totalOvr += manualOvr;
       ratedAthletes++;
 
@@ -124,11 +129,18 @@ class RatingRepository {
         'ovrDay': null,
         'ovrCap': null,
         'currentRating': {
-            'Athlete': ath,
-            'Student': stu,
-            'Teammate': tm,
-            'Citizen': cit,
-        }
+            'Athlete': buckets.athleteScore,
+            'Student': buckets.studentScore,
+            'Teammate': buckets.teammateScore,
+            'Citizen': buckets.citizenScore,
+        },
+        // Persist raw transaction sums so the UI can show actual awarded points.
+        'rawBucketPoints': {
+            'Athlete': stats[aId]!['ath']!.toInt(),
+            'Student': stats[aId]!['stu']!.toInt(),
+            'Teammate': stats[aId]!['tm']!.toInt(),
+            'Citizen': stats[aId]!['cit']!.toInt(),
+        },
       });
     }
 
@@ -151,6 +163,7 @@ class RatingRepository {
         seasonLengthDays: seasonLengthDays,
       ),
       startingOvrBaseline: startingOvrBaseline,
+      rosterBucketRaw: rosterBucketRaw,
     );
   }
 
@@ -169,6 +182,7 @@ class RatingRepository {
     required String teamId,
     required curve.SeasonPhase phase,
     required int startingOvrBaseline,
+    Map<String, Map<String, double>>? rosterBucketRaw,
   }) async {
     final firestore = _provider.firestore;
 
@@ -191,6 +205,7 @@ class RatingRepository {
     }
 
     final combinedByAthlete = <String, double>{};
+    final baselineByAthlete = <String, int>{};
     for (final doc in athletesSnap.docs) {
       final data = doc.data();
 
@@ -211,15 +226,93 @@ class RatingRepository {
         speedScore: speed,
         gpaScoreValue: curve.gpaScore(gpa),
       );
-      final mv = curve.manualInputValueFromManualOvr(manual);
+
+      // IMPORTANT: baseline manual OVR must contribute 0 to combinedScore.
+      // Otherwise unscored athletes (manualOvr == baseline) get lifted by the curve.
+      final overrideRaw = data['individualBaseOvrOverride'];
+      final athleteBaseline = (overrideRaw is num)
+          ? overrideRaw.toInt().clamp(0, 90)
+          : startingOvrBaseline.clamp(0, 90);
+      final mv = curve.manualInputValueFromManualOvrAboveBaseline(
+        manualOvr: manual,
+        baseline: athleteBaseline,
+      );
       combinedByAthlete[doc.id] =
           curve.combinedScore(assessmentValue: av, manualInputValue: mv);
+
+      // Per-athlete baseline override (v1.0.6) — falls back to team baseline
+      // when missing/null on the user doc.
+      if (overrideRaw is num) {
+        baselineByAthlete[doc.id] = overrideRaw.toInt().clamp(0, 90);
+      }
     }
+
+    // ── Top Dawg pre-pass for gating ─────────────────────────────────────
+    // If the caller didn't supply pre-computed raw buckets (assessment-only
+    // path) we must rebuild them from transactions.
+    var effectiveBucketRaw = rosterBucketRaw;
+    if (effectiveBucketRaw == null) {
+      // Fetch the team's season to get the seasonId.
+      final teamDoc = await firestore.collection('teams').doc(teamId).get();
+      final seasonId = teamDoc.data()?['currentSeasonId'] as String?;
+      if (seasonId != null && seasonId.isNotEmpty) {
+        final txSnap = await firestore
+            .collection('transactions')
+            .where('teamId', isEqualTo: teamId)
+            .where('seasonId', isEqualTo: seasonId)
+            .where('isArchived', isEqualTo: false)
+            .get();
+
+        effectiveBucketRaw = <String, Map<String, double>>{};
+        for (final doc in athletesSnap.docs) {
+          effectiveBucketRaw[doc.id] = {'ath': 0, 'stu': 0, 'tm': 0, 'cit': 0};
+        }
+        for (final txDoc in txSnap.docs) {
+          final d = txDoc.data();
+          final aId = d['athleteId'] as String? ?? '';
+          if (!effectiveBucketRaw.containsKey(aId)) continue;
+          final v = (d['value'] as num?)?.toDouble() ?? 0;
+          switch ((d['category'] as String? ?? '').toLowerCase()) {
+            case 'athlete':
+            case 'competitor':
+            case 'performance':
+              effectiveBucketRaw[aId]!['ath'] =
+                  effectiveBucketRaw[aId]!['ath']! + v;
+              break;
+            case 'student':
+            case 'class':
+            case 'classroom':
+              effectiveBucketRaw[aId]!['stu'] =
+                  effectiveBucketRaw[aId]!['stu']! + v;
+              break;
+            case 'teammate':
+            case 'program':
+              effectiveBucketRaw[aId]!['tm'] =
+                  effectiveBucketRaw[aId]!['tm']! + v;
+              break;
+            case 'citizen':
+            case 'standard':
+              effectiveBucketRaw[aId]!['cit'] =
+                  effectiveBucketRaw[aId]!['cit']! + v;
+              break;
+            default:
+              effectiveBucketRaw[aId]!['ath'] =
+                  effectiveBucketRaw[aId]!['ath']! + v;
+          }
+        }
+      }
+    }
+
+    final bucketScoresByAthlete = effectiveBucketRaw != null
+        ? curve.computeTopDawgSubjectiveScores(effectiveBucketRaw)
+        : null;
 
     final ratings = curve.assignOverallRatingsFromCombinedScore(
       combinedByAthlete,
       phase,
       startingOvrBaseline: startingOvrBaseline,
+      baselineByAthlete: baselineByAthlete,
+      bucketScoresByAthlete: bucketScoresByAthlete,
     );
     if (ratings.isEmpty) return;
 
@@ -375,9 +468,17 @@ class RatingRepository {
         feedOps.add((b) {
           final notifRef = firestore.collection('notifications').doc();
           final title = v >= 0 ? 'Points Awarded!' : 'Points updated';
+          // When no dropdown subcategory was chosen the coach's free-text note
+          // carries the reason — suffix the note (if any) instead of an empty
+          // "(...)" parenthetical.
+          final subTrim = sub.trim();
+          final noteTrim = note.trim();
+          final suffix = subTrim.isNotEmpty
+              ? ' ($subTrim)'
+              : (noteTrim.isNotEmpty ? ' — $noteTrim' : '');
           final body = v >= 0
-              ? 'You received $v points in $cat ($sub).'
-              : 'Adjustment: $v points in $cat ($sub).';
+              ? 'You received $v points in $cat$suffix.'
+              : 'Adjustment: $v points in $cat$suffix.';
           b.set(notifRef, {
             'id': notifRef.id,
             'userId': athleteId,

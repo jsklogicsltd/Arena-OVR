@@ -432,6 +432,76 @@ final Map<String, Map<int, Map<String, TierThresholds>>> tierTables = {
     },
   },
 
+  // ── 5-10-5 PRO AGILITY SHUTTLE (seconds — lower is better) ──────────────
+  //
+  // Tier buckets: `good` and `allAmerican` are the user-provided official
+  // norms; `great` / `allState` are linearly interpolated for display parity
+  // with other speed events (scoring only consumes `good`/`allAmerican`).
+  'shuttle_5_10_5': {
+    // Middle School — standard profile
+    7: {
+      'standard': const TierThresholds(
+        good: 4.80, great: 4.60, allState: 4.48, allAmerican: 4.40,
+        lowerIsBetter: true,
+      ),
+      'heavy': const TierThresholds(
+        good: 5.00, great: 4.80, allState: 4.68, allAmerican: 4.60,
+        lowerIsBetter: true,
+      ),
+    },
+    8: {
+      'standard': const TierThresholds(
+        good: 4.80, great: 4.60, allState: 4.48, allAmerican: 4.40,
+        lowerIsBetter: true,
+      ),
+      'heavy': const TierThresholds(
+        good: 5.00, great: 4.80, allState: 4.68, allAmerican: 4.60,
+        lowerIsBetter: true,
+      ),
+    },
+    // High School — standard profile
+    9: {
+      'standard': const TierThresholds(
+        good: 4.50, great: 4.30, allState: 4.18, allAmerican: 4.10,
+        lowerIsBetter: true,
+      ),
+      'heavy': const TierThresholds(
+        good: 4.80, great: 4.55, allState: 4.40, allAmerican: 4.30,
+        lowerIsBetter: true,
+      ),
+    },
+    10: {
+      'standard': const TierThresholds(
+        good: 4.50, great: 4.30, allState: 4.18, allAmerican: 4.10,
+        lowerIsBetter: true,
+      ),
+      'heavy': const TierThresholds(
+        good: 4.80, great: 4.55, allState: 4.40, allAmerican: 4.30,
+        lowerIsBetter: true,
+      ),
+    },
+    11: {
+      'standard': const TierThresholds(
+        good: 4.50, great: 4.30, allState: 4.18, allAmerican: 4.10,
+        lowerIsBetter: true,
+      ),
+      'heavy': const TierThresholds(
+        good: 4.80, great: 4.55, allState: 4.40, allAmerican: 4.30,
+        lowerIsBetter: true,
+      ),
+    },
+    12: {
+      'standard': const TierThresholds(
+        good: 4.50, great: 4.30, allState: 4.18, allAmerican: 4.10,
+        lowerIsBetter: true,
+      ),
+      'heavy': const TierThresholds(
+        good: 4.80, great: 4.55, allState: 4.40, allAmerican: 4.30,
+        lowerIsBetter: true,
+      ),
+    },
+  },
+
   // Legacy alias (old key name used by earlier builds)
   '20_yard_dash': {
     7: {

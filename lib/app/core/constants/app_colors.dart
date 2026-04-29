@@ -15,7 +15,7 @@ class AppColors {
   static const Color tierBronze = Color(0xFFCD7F32);
   static const Color tierSilver = Color(0xFFC0C0C0);
   static const Color tierGold = Color(0xFFFFB800);
-  static const Color tierPurple = Color(0xFF9B30FF);
+  static const Color tierBlue = Color(0xFF00AAFF);
   static const Color tierDiamond = Color(0xFF00FFFF);
 
   static const Color seasonGold = Color(0xFFFFD700);
@@ -25,7 +25,7 @@ class AppColors {
     if (ovr < 30) return tierBronze;
     if (ovr < 60) return tierSilver;
     if (ovr < 80) return tierGold;
-    if (ovr < 95) return tierPurple;
+    if (ovr < 95) return tierBlue;
     return tierDiamond;
   }
 }

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import '../../data/repositories/badge_repository.dart';
 
 /// Reusable badge grid for athlete dashboard and profile.
@@ -120,12 +119,6 @@ class _BadgeItem extends StatelessWidget {
                         : _fallbackIcon(false),
                   ],
                 ),
-              )
-              .animate(delay: Duration(milliseconds: 400 + index * 70))
-              .scale(
-                begin: const Offset(0.5, 0.5),
-                duration: 500.ms,
-                curve: Curves.elasticOut,
               ),
           const SizedBox(height: 6),
           Text(

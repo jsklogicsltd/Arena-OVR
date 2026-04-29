@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:audio_session/audio_session.dart';
 import 'components/video_background.dart';
 import 'app/core/services/notification_service.dart';
 import 'app/routes/app_pages.dart';
@@ -17,6 +18,23 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
+
+  // Keep Spotify/Apple Music playing while app videos render.
+  final session = await AudioSession.instance;
+  // audio_session 0.2.x requires a non-null AndroidAudioFocusGainType.
+  // We use gainTransientMayDuck (softer than default gain) for ambient-style
+  // playback that should disturb background audio less than full permanent focus.
+  await session.configure(const AudioSessionConfiguration(
+    avAudioSessionCategory: AVAudioSessionCategory.ambient,
+    avAudioSessionCategoryOptions: AVAudioSessionCategoryOptions.mixWithOthers,
+    avAudioSessionMode: AVAudioSessionMode.defaultMode,
+    androidAudioAttributes: AndroidAudioAttributes(
+      contentType: AndroidAudioContentType.movie,
+      usage: AndroidAudioUsage.media,
+    ),
+    androidAudioFocusGainType: AndroidAudioFocusGainType.gainTransientMayDuck,
+  ));
+
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
   NotificationService();
   Get.put(ThemeController());

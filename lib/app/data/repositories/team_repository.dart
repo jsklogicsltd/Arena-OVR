@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/team_model.dart';
 import '../models/user_model.dart';
 import '../providers/firebase_provider.dart';
+import 'badge_repository.dart' show BadgeIds;
 
 class TeamRepository {
   final FirebaseProvider _provider = FirebaseProvider();
@@ -229,14 +230,25 @@ class TeamRepository {
         .where('teamId', isEqualTo: teamId)
         .where('role', isEqualTo: 'athlete')
         .get();
-    final athletePayload = _athleteSeasonResetUpdates(safeBaseline);
     for (var doc in athletesSnap.docs) {
-      batch.update(doc.reference, athletePayload);
+      batch.update(doc.reference, {
+        ..._athleteSeasonResetUpdates(safeBaseline),
+        'badges': _preserveNonArenaBadges(doc.data()['badges']),
+      });
       ops++;
       await flushIfNeeded();
     }
 
     if (ops > 0) await batch.commit();
+  }
+
+  /// Keeps legacy/meta entries (e.g. `"First Step"`) not in [BadgeIds.all].
+  static List<String> _preserveNonArenaBadges(dynamic raw) {
+    final list = raw is List
+        ? raw.map((e) => e.toString()).toList()
+        : <String>[];
+    final arena = BadgeIds.all.toSet();
+    return list.where((b) => !arena.contains(b)).toList();
   }
 
   /// Single-document payload for an athlete when starting a new season.
@@ -352,9 +364,11 @@ class TeamRepository {
         .where('role', isEqualTo: 'athlete')
         .get();
         
-    final athletePayload = _athleteSeasonResetUpdates(startingOvrBaseline);
     for (var doc in athletesSnap.docs) {
-      batch.update(doc.reference, athletePayload);
+      batch.update(doc.reference, {
+        ..._athleteSeasonResetUpdates(startingOvrBaseline),
+        'badges': _preserveNonArenaBadges(doc.data()['badges']),
+      });
       ops++;
       await flushIfNeeded();
     }

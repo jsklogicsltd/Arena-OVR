@@ -16,6 +16,7 @@ import '../../data/repositories/team_repository.dart';
 import '../../data/repositories/rating_repository.dart';
 import '../../data/models/challenge_catalog.dart';
 import '../../scoring_engine/scoring_engine.dart';
+import '../../scoring_engine/scoring_engine.dart' as curve;
 import '../../scoring_engine/tier_tables.dart';
 
 class CoachController extends GetxController {
@@ -883,6 +884,7 @@ class CoachController extends GetxController {
       final deadLift = vals['deadLift'];
       final dash40 = vals['dash40'];
       final fly10 = vals['fly10'];
+      final shuttle = vals['shuttle'];
       final verticalJump = vals['verticalJump'];
       final broadJump = vals['broadJump'];
       final gpa = vals['gpa'];
@@ -893,6 +895,7 @@ class CoachController extends GetxController {
           deadLift == null &&
           dash40 == null &&
           fly10 == null &&
+          shuttle == null &&
           verticalJump == null &&
           broadJump == null &&
           gpa == null) {
@@ -937,6 +940,11 @@ class CoachController extends GetxController {
             scoreEventByName('10_yard_fly', grade, sProfile, fly10, tierTables);
         if (s != null) speedScores.add(s);
       }
+      if (shuttle != null) {
+        final s = scoreEventByName(
+            'shuttle_5_10_5', grade, sProfile, shuttle, tierTables);
+        if (s != null) speedScores.add(s);
+      }
       if (verticalJump != null) {
         final s = scoreEventByName(
             'vertical_jump', grade, sProfile, verticalJump, tierTables);
@@ -965,6 +973,7 @@ class CoachController extends GetxController {
           if (deadLift != null) 'dead_lift': deadLift,
           if (dash40 != null) '40_yard_dash': dash40,
           if (fly10 != null) '10_yard_fly': fly10,
+          if (shuttle != null) 'shuttle_5_10_5': shuttle,
           if (verticalJump != null) 'vertical_jump': verticalJump,
           if (broadJump != null) 'standing_long_jump': broadJump,
           if (gpa != null) 'gpa': gpa,
@@ -983,6 +992,7 @@ class CoachController extends GetxController {
           if (deadLift != null) 'dead_lift': deadLift,
           if (dash40 != null) '40_yard_dash': dash40,
           if (fly10 != null) '10_yard_fly': fly10,
+          if (shuttle != null) 'shuttle_5_10_5': shuttle,
           if (verticalJump != null) 'vertical_jump': verticalJump,
           if (broadJump != null) 'standing_long_jump': broadJump,
           if (gpa != null) 'gpa': gpa,
@@ -1001,6 +1011,7 @@ class CoachController extends GetxController {
           if (deadLift != null) 'dead_lift': deadLift,
           if (dash40 != null) '40_yard_dash': dash40,
           if (fly10 != null) '10_yard_fly': fly10,
+          if (shuttle != null) 'shuttle_5_10_5': shuttle,
           if (verticalJump != null) 'vertical_jump': verticalJump,
           if (broadJump != null) 'standing_long_jump': broadJump,
           if (gpa != null) 'gpa': gpa,
@@ -1074,6 +1085,7 @@ class CoachController extends GetxController {
         .get();
 
     final combinedByAthlete = <String, double>{};
+    final baselineByAthlete = <String, int>{};
     for (final d in rosterSnap.docs) {
       final data = d.data();
       data['uid'] = d.id;
@@ -1093,17 +1105,82 @@ class CoachController extends GetxController {
         speedScore: (speed ?? 0).clamp(0, 99),
         gpaScoreValue: gpaScore(gpa),
       );
-      final mv = manualInputValueFromManualOvr(manual);
+
+      // Baseline manual OVR must contribute 0 to combined score.
+      final athleteBaseline =
+          (a.individualBaseOvrOverride ?? startingOvrBaseline).clamp(0, 90);
+      final mv = manualInputValueFromManualOvrAboveBaseline(
+        manualOvr: manual,
+        baseline: athleteBaseline,
+      );
       combinedByAthlete[uid] =
           combinedScore(assessmentValue: av, manualInputValue: mv);
+      final overrideVal = a.individualBaseOvrOverride;
+      if (overrideVal != null) {
+        baselineByAthlete[uid] = overrideVal.clamp(0, 90);
+      }
     }
 
     if (combinedByAthlete.isEmpty) return;
+
+    // ── Top Dawg bucket pre-pass for gating ──────────────────────────────────
+    final seasonId = season.value?.id;
+    Map<String, SubjectiveBucketScores>? bucketScoresByAthlete;
+    if (seasonId != null && seasonId.isNotEmpty) {
+      final txSnap = await _firestore
+          .collection('transactions')
+          .where('teamId', isEqualTo: teamId)
+          .where('seasonId', isEqualTo: seasonId)
+          .where('isArchived', isEqualTo: false)
+          .get();
+
+      final rosterBucketRaw = <String, Map<String, double>>{};
+      for (final d in rosterSnap.docs) {
+        rosterBucketRaw[d.id] = {'ath': 0, 'stu': 0, 'tm': 0, 'cit': 0};
+      }
+      for (final txDoc in txSnap.docs) {
+        final d = txDoc.data();
+        final aId = d['athleteId'] as String? ?? '';
+        if (!rosterBucketRaw.containsKey(aId)) continue;
+        final v = (d['value'] as num?)?.toDouble() ?? 0;
+        switch ((d['category'] as String? ?? '').toLowerCase()) {
+          case 'athlete':
+          case 'competitor':
+          case 'performance':
+            rosterBucketRaw[aId]!['ath'] =
+                rosterBucketRaw[aId]!['ath']! + v;
+            break;
+          case 'student':
+          case 'class':
+          case 'classroom':
+            rosterBucketRaw[aId]!['stu'] =
+                rosterBucketRaw[aId]!['stu']! + v;
+            break;
+          case 'teammate':
+          case 'program':
+            rosterBucketRaw[aId]!['tm'] =
+                rosterBucketRaw[aId]!['tm']! + v;
+            break;
+          case 'citizen':
+          case 'standard':
+            rosterBucketRaw[aId]!['cit'] =
+                rosterBucketRaw[aId]!['cit']! + v;
+            break;
+          default:
+            rosterBucketRaw[aId]!['ath'] =
+                rosterBucketRaw[aId]!['ath']! + v;
+        }
+      }
+      bucketScoresByAthlete =
+          curve.computeTopDawgSubjectiveScores(rosterBucketRaw);
+    }
 
     final ratings = assignOverallRatingsFromCombinedScore(
       combinedByAthlete,
       phase,
       startingOvrBaseline: startingOvrBaseline,
+      baselineByAthlete: baselineByAthlete,
+      bucketScoresByAthlete: bucketScoresByAthlete,
     );
 
     // Persist: finalOvr (single source of truth)

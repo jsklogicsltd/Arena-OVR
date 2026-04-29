@@ -8,7 +8,8 @@ class BadgesController extends GetxController {
   List<String> get earnedBadgeIds {
     try {
       final athlete = Get.find<PlayerController>().athlete.value;
-      return athlete?.badges ?? [];
+      if (athlete == null) return [];
+      return BadgeIds.trophyDisplayMerge(athlete);
     } catch (_) {
       return [];
     }

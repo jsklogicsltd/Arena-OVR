@@ -9,6 +9,7 @@ import '../../core/widgets/stadium_background.dart';
 import '../../core/widgets/fire_sparks_background.dart';
 import '../../core/components/animated_glowing_border.dart';
 import '../../data/models/feed_model.dart';
+import '../../data/repositories/badge_repository.dart';
 import '../coach/coach_controller.dart';
 import '../coach/views/announcement_view.dart';
 
@@ -606,15 +607,76 @@ class PointAwardCard extends StatelessWidget {
   }
 }
 
+/// Left avatar: earned badge PNG or legacy star fallback.
+class _BadgeEarnedLeading extends StatelessWidget {
+  final String? assetId;
+
+  const _BadgeEarnedLeading({required this.assetId});
+
+  @override
+  Widget build(BuildContext context) {
+    final id = assetId?.trim();
+    if (id != null && id.isNotEmpty) {
+      return SizedBox(
+        width: 56,
+        height: 56,
+        child: ClipOval(
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              const ColoredBox(color: Color(0xFF1A3049)),
+              Image.asset(
+                'assets/badges/$id.png',
+                fit: BoxFit.cover,
+                alignment: Alignment.center,
+                filterQuality: FilterQuality.high,
+                errorBuilder: (_, __, ___) => _fallbackStar(),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    return _fallbackStar();
+  }
+
+  Widget _fallbackStar() {
+    return Container(
+      width: 56,
+      height: 56,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Colors.orange.shade400, Colors.amber.shade700],
+        ),
+        boxShadow: [
+          BoxShadow(color: Colors.amber.withValues(alpha: 0.35), blurRadius: 10),
+        ],
+      ),
+      child: const Icon(Icons.star_rounded, color: Colors.white, size: 30),
+    );
+  }
+}
+
 // ─── Badge Earned Card ─────────────────────────────────────────────────────
-// Figma: gradient #2D1B4E -> #141B2D, border #A855F7 30%, radius 24, padding 16
+// Navy surface; leading art = `assets/badges/{badgeId}.png` when known.
 class BadgeEarnedCard extends StatelessWidget {
   final FeedModel item;
 
   const BadgeEarnedCard({required this.item});
 
+  String? get _badgeAssetId {
+    final raw = item.badgeId?.trim();
+    if (raw != null && raw.isNotEmpty) return raw;
+    return BadgeIds.assetIdFromEarnedContent(item.content);
+  }
+
   @override
   Widget build(BuildContext context) {
+    final assetId = _badgeAssetId;
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
@@ -622,10 +684,10 @@ class BadgeEarnedCard extends StatelessWidget {
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFF2D1B4E), Color(0xFF141B2D)],
+          colors: [Color(0xFF0E1A2A), Color(0xFF152A42)],
         ),
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: const Color(0xFFA855F7).withValues(alpha: 0.3), width: 1),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.10), width: 1),
         boxShadow: [
           BoxShadow(color: Colors.black.withValues(alpha: 0.1), offset: const Offset(0, 8), blurRadius: 10, spreadRadius: -6),
           BoxShadow(color: Colors.black.withValues(alpha: 0.1), offset: const Offset(0, 20), blurRadius: 25, spreadRadius: -5),
@@ -633,20 +695,7 @@ class BadgeEarnedCard extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Container(
-            width: 56,
-            height: 56,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [Colors.orange.shade400, Colors.amber.shade700],
-              ),
-              boxShadow: [BoxShadow(color: Colors.amber.withValues(alpha: 0.4), blurRadius: 12)],
-            ),
-            child: const Icon(Icons.star_rounded, color: Colors.white, size: 32),
-          ),
+          _BadgeEarnedLeading(assetId: assetId),
           const SizedBox(width: 16),
           Expanded(
             child: Column(
@@ -679,7 +728,7 @@ class BadgeEarnedCard extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text(
                   item.content.isNotEmpty ? item.content : 'Earned a new badge',
-                  style: GoogleFonts.inter(color: const Color(0xFFB8A8D0), fontSize: 12),
+                  style: GoogleFonts.inter(color: const Color(0xFFA8B8CC), fontSize: 12),
                 ),
               ],
             ),

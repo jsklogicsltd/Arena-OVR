@@ -81,19 +81,19 @@ class PlayerRating {
 enum SeasonPhase { phase1, phase2, phase3 }
 
 /// Returns the OVR ceiling for the given [phase] and team baseline.
+///
+/// **v1.0.6 — Time-based ceiling REMOVED.** Per client direction the engine no
+/// longer throttles OVR by phase/day; raw curved values are persisted. The
+/// function intentionally returns `99` for every phase so callers that still
+/// pass [phase] (badge engine, leaderboard, legacy code paths) keep compiling.
+///
+/// To restore phase-based throttling in the future, revert this function body
+/// to the previous baseline-derived `phase1Cap`/`phase2Cap` math.
 int phaseCap(SeasonPhase phase, {int startingOvrBaseline = 50}) {
-  final baseline = startingOvrBaseline.clamp(0, 90);
-  final earnablePoints = 99 - baseline;
-  final phase1Cap = baseline + (earnablePoints / 3.0).floor();
-  final phase2Cap = baseline + ((earnablePoints * 2.0) / 3.0).floor();
-  switch (phase) {
-    case SeasonPhase.phase1:
-      return phase1Cap;
-    case SeasonPhase.phase2:
-      return phase2Cap;
-    case SeasonPhase.phase3:
-      return 99;
-  }
+  // Argument ignored on purpose — see header comment.
+  // ignore: unused_local_variable
+  final _ = startingOvrBaseline.clamp(0, 90);
+  return 99;
 }
 
 SeasonPhase phaseForDay({
@@ -148,6 +148,21 @@ double assessmentValue({
 double manualInputValueFromManualOvr(int manualOvr) {
   final m = manualOvr.clamp(0, 99);
   return m * 0.50;
+}
+
+/// Manual Input Value **above baseline** (0..49.50).
+///
+/// This is critical for the curve engine: a team baseline (e.g. 60) represents
+/// "zero earned subjective points", so it must contribute 0 to the combined score.
+double manualInputValueFromManualOvrAboveBaseline({
+  required int manualOvr,
+  required int baseline,
+}) {
+  final m = manualOvr.clamp(0, 99);
+  final b = baseline.clamp(0, 90);
+  final earned = (m - b);
+  if (earned <= 0) return 0;
+  return earned * 0.50;
 }
 
 /// Combined Score fed into the curve engine.
@@ -306,50 +321,190 @@ List<PlayerRating> assignOverallRatings(
     ..sort((a, b) => b.overallRating.compareTo(a.overallRating));
 }
 
+// ---------------------------------------------------------------------------
+// "Top Dawg" Subjective Curve + Zero/80 Gates (v2.0)
+// ---------------------------------------------------------------------------
+//
+// Phase 1 — Top Dawg Curve
+// For each of the 4 subjective buckets (Athlete/Competitor, Student, Teammate,
+// Citizen) the score is scaled relative to the team's best performer in that
+// category. The team "Top Dawg" for a bucket always maps to 99; everyone else
+// scales proportionally.
+//
+// Phase 2 — Gating Hierarchy
+// After the curve OVR is computed the following strict gates are applied:
+//   1. Zero Category Hard Cap: if ANY scaled bucket == 0 → cap at 84.
+//   2. Subjective Gate 80: if manualOvr < 80 and curveOvr ≥ 90 → cap at 89.
+//   3. Otherwise: full curveOvr is awarded.
+
+/// Holds the 4 scaled subjective bucket scores for a single athlete.
+class SubjectiveBucketScores {
+  final int athleteScore;
+  final int studentScore;
+  final int teammateScore;
+  final int citizenScore;
+
+  /// The Top Dawg-curved manual OVR (average of the 4 bucket scores, rounded).
+  final int manualOvr;
+
+  const SubjectiveBucketScores({
+    required this.athleteScore,
+    required this.studentScore,
+    required this.teammateScore,
+    required this.citizenScore,
+    required this.manualOvr,
+  });
+
+  /// Returns `true` if ANY of the 4 buckets equals exactly 0.
+  bool get hasZeroBucket =>
+      athleteScore == 0 ||
+      studentScore == 0 ||
+      teammateScore == 0 ||
+      citizenScore == 0;
+}
+
+/// Pre-pass: find the highest raw point total for each subjective bucket
+/// across the entire roster, then scale each athlete's raw totals against
+/// that Top Dawg ceiling.
+///
+/// [rosterBucketRaw] maps `playerId → { 'ath': double, 'stu': double,
+/// 'tm': double, 'cit': double }`.
+///
+/// Returns a map `playerId → SubjectiveBucketScores`.
+Map<String, SubjectiveBucketScores> computeTopDawgSubjectiveScores(
+  Map<String, Map<String, double>> rosterBucketRaw,
+) {
+  // 1. Find team-wide maxima for each bucket.
+  double maxAthRaw = 0;
+  double maxStuRaw = 0;
+  double maxTmRaw = 0;
+  double maxCitRaw = 0;
+
+  for (final buckets in rosterBucketRaw.values) {
+    final ath = buckets['ath'] ?? 0;
+    final stu = buckets['stu'] ?? 0;
+    final tm = buckets['tm'] ?? 0;
+    final cit = buckets['cit'] ?? 0;
+    if (ath > maxAthRaw) maxAthRaw = ath;
+    if (stu > maxStuRaw) maxStuRaw = stu;
+    if (tm > maxTmRaw) maxTmRaw = tm;
+    if (cit > maxCitRaw) maxCitRaw = cit;
+  }
+
+  // 2. Scale each athlete's buckets against the team Top Dawg.
+  int scaleBucket(double playerRaw, double maxRaw) {
+    if (maxRaw <= 0) return 0;
+    return ((playerRaw / maxRaw) * 99).round();
+  }
+
+  final result = <String, SubjectiveBucketScores>{};
+  for (final entry in rosterBucketRaw.entries) {
+    final id = entry.key;
+    final b = entry.value;
+    final athScore = scaleBucket(b['ath'] ?? 0, maxAthRaw);
+    final stuScore = scaleBucket(b['stu'] ?? 0, maxStuRaw);
+    final tmScore = scaleBucket(b['tm'] ?? 0, maxTmRaw);
+    final citScore = scaleBucket(b['cit'] ?? 0, maxCitRaw);
+
+    final manualBase = (athScore + stuScore + tmScore + citScore) / 4.0;
+    final manualOvr = manualBase.round();
+
+    result[id] = SubjectiveBucketScores(
+      athleteScore: athScore,
+      studentScore: stuScore,
+      teammateScore: tmScore,
+      citizenScore: citScore,
+      manualOvr: manualOvr,
+    );
+  }
+  return result;
+}
+
+/// Applies the v2.0 Zero Category / Subjective-80 gating hierarchy to a
+/// curved OVR.
+///
+/// 1. If ANY scaled bucket == 0 → hard cap at 84.
+/// 2. Else if manualOvr < 80 AND curveOvr ≥ 90 → cap at 89.
+/// 3. Else → full curveOvr.
+int applyTopDawgGates(int curveOvr, SubjectiveBucketScores buckets) {
+  if (buckets.hasZeroBucket) {
+    return min(curveOvr, 84);
+  }
+  if (buckets.manualOvr < 80 && curveOvr >= 90) {
+    return 89;
+  }
+  return curveOvr;
+}
+
 /// Curve-engine for the locked 50/50 Combined Score model.
 ///
 /// Each player must have a **combined score** (decimal). The team leader
-/// (highest combined score) gets the phase cap; everyone else scales
-/// proportionally.
+/// (highest combined score) gets the (effective) cap; everyone else scales
+/// proportionally relative to that leader.
 ///
-/// \[
-/// ovr = clamp(
-///   baseline + ceil((combined / highestCombined) * (cap - baseline)),
-///   baseline,
-///   cap
-/// )
-/// \]
+/// **v2.0 — Top Dawg gates replace the old milestone gates.**
+/// * Per-athlete baseline support: pass [baselineByAthlete] to override the
+///   team-wide [startingOvrBaseline] for specific athletes (e.g. dual-sport
+///   locked-in baselines). Athletes missing from the map fall back to
+///   [startingOvrBaseline]. Each athlete's OVR floor is their own baseline.
+/// * Top Dawg gating: pass [bucketScoresByAthlete] (pre-computed via
+///   [computeTopDawgSubjectiveScores]) and the engine will apply the
+///   Zero-Category / Subjective-80 gates (see [applyTopDawgGates]).
+///
+/// Backwards compatible: callers that don't pass the new map get no gating.
 List<PlayerRating> assignOverallRatingsFromCombinedScore(
   Map<String, double> combinedScores, // playerId → combinedScore (decimal)
   SeasonPhase phase, {
   int startingOvrBaseline = 50,
-}
-) {
+  Map<String, int>? baselineByAthlete,
+  Map<String, SubjectiveBucketScores>? bucketScoresByAthlete,
+}) {
   if (combinedScores.isEmpty) return [];
 
-  final baseline = startingOvrBaseline.clamp(0, 90);
-  final int cap = phaseCap(phase, startingOvrBaseline: baseline);
+  final teamBaseline = startingOvrBaseline.clamp(0, 90);
+  final int cap = phaseCap(phase, startingOvrBaseline: teamBaseline);
   final double highest = combinedScores.values.reduce(max);
+
+  int baselineFor(String id) {
+    final v = baselineByAthlete?[id];
+    if (v == null) return teamBaseline;
+    return v.clamp(0, 90);
+  }
+
   if (highest <= 0) {
     return combinedScores.entries
         .map((e) => PlayerRating(
               playerId: e.key,
               topPerformancePoints: e.value.round(),
-              overallRating: baseline,
+              overallRating: baselineFor(e.key),
             ))
         .toList()
       ..sort((a, b) => b.overallRating.compareTo(a.overallRating));
   }
 
   return combinedScores.entries.map((e) {
+    final id = e.key;
     final double score = e.value <= 0 ? 0 : e.value;
-    final double raw = (score / highest) * (cap - baseline);
-    final int finalOvr = baseline + raw.ceil();
-    final int ovr = finalOvr.clamp(baseline, cap);
+    final int athleteBaseline = baselineFor(id);
+    // Curve scales the leader to [cap]. Each athlete is floored at their own
+    // baseline so per-athlete overrides cannot drag someone below their
+    // locked-in starting OVR.
+    final double raw = (score / highest) * (cap - athleteBaseline);
+    final int curveOvr = (athleteBaseline + raw.ceil()).clamp(athleteBaseline, cap);
+
+    // Apply Top Dawg Zero/80 gates (v2.0) when bucket scores are available.
+    int finalOvr = curveOvr;
+    final buckets = bucketScoresByAthlete?[id];
+    if (buckets != null) {
+      finalOvr = applyTopDawgGates(curveOvr, buckets);
+      // Never drop below the athlete's own baseline floor due to gating.
+      if (finalOvr < athleteBaseline) finalOvr = athleteBaseline;
+    }
+
     return PlayerRating(
-      playerId: e.key,
+      playerId: id,
       topPerformancePoints: e.value.round(),
-      overallRating: ovr,
+      overallRating: finalOvr,
     );
   }).toList()
     ..sort((a, b) => b.overallRating.compareTo(a.overallRating));

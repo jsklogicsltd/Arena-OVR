@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Arena OVR brand primary — mirrors AppColors.primary (0xFF00A3FF) in Dart.
+         Used as the tint color for the FCM small notification icon on Android 5+. -->
+    <color name="colorAccent">#00A3FF</color>
+</resources>

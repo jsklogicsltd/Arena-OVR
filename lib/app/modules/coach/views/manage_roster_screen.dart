@@ -47,6 +47,9 @@ class ManageRosterScreen extends StatelessWidget {
     final pos = (athlete.positionGroup ?? '').trim().toUpperCase();
     String selectedPos = _positionGroups.contains(pos) ? pos : _positionGroups.first;
     final tagCtrl = TextEditingController(text: athlete.customTag ?? '');
+    final baseOvrCtrl = TextEditingController(
+      text: athlete.individualBaseOvrOverride?.toString() ?? '',
+    );
     bool isSaving = false;
 
     await showModalBottomSheet<void>(
@@ -58,6 +61,22 @@ class ManageRosterScreen extends StatelessWidget {
           builder: (context, setModalState) {
             Future<void> save() async {
               final tag = tagCtrl.text.trim();
+              final baseRaw = baseOvrCtrl.text.trim();
+              int? baseOverride;
+              if (baseRaw.isNotEmpty) {
+                final parsed = int.tryParse(baseRaw);
+                if (parsed == null || parsed < 0 || parsed > 90) {
+                  Get.snackbar(
+                    'Invalid Base OVR',
+                    'Custom Starting OVR must be a number between 0 and 90.',
+                    snackPosition: SnackPosition.BOTTOM,
+                    backgroundColor: Colors.red.withValues(alpha: 0.85),
+                    colorText: Colors.white,
+                  );
+                  return;
+                }
+                baseOverride = parsed;
+              }
               setModalState(() => isSaving = true);
               try {
                 await FirebaseFirestore.instance
@@ -66,6 +85,8 @@ class ManageRosterScreen extends StatelessWidget {
                     .update({
                   'positionGroup': selectedPos,
                   'customTag': tag.isEmpty ? FieldValue.delete() : tag,
+                  'individualBaseOvrOverride':
+                      baseOverride ?? FieldValue.delete(),
                 });
                 if (tag.isNotEmpty) {
                   await FirebaseFirestore.instance
@@ -331,7 +352,74 @@ class ManageRosterScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: 12),
                       tagChips(),
+                      const SizedBox(height: 18),
+
+                      // ── Custom Starting OVR (per-athlete override) ──────
+                      Row(
+                        children: [
+                          Text(
+                            'CUSTOM STARTING OVR',
+                            style: GoogleFonts.spaceGrotesk(
+                              color: Colors.white54,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 1.2,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          const Icon(Icons.edit,
+                              size: 12, color: Colors.white38),
+                          const Spacer(),
+                          Text(
+                            'Team default: ${athlete.individualBaseOvrOverride == null ? 'in use' : 'overridden'}',
+                            style: GoogleFonts.inter(
+                              color: Colors.white38,
+                              fontSize: 10,
+                              fontStyle: FontStyle.italic,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: baseOvrCtrl,
+                        enabled: !isSaving,
+                        keyboardType: TextInputType.number,
+                        style: GoogleFonts.inter(color: Colors.white),
+                        decoration: InputDecoration(
+                          hintText:
+                              'Leave blank to use team default (0–90)',
+                          hintStyle: GoogleFonts.inter(color: Colors.white38),
+                          filled: true,
+                          fillColor: Colors.white.withValues(alpha: 0.06),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(
+                                color: Colors.white.withValues(alpha: 0.12)),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(
+                                color: Colors.white.withValues(alpha: 0.12)),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide:
+                                const BorderSide(color: AppColors.primary),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Use for dual-sport athletes who arrive with a higher locked-in baseline. Leave blank to inherit the team\u2019s starting OVR.',
+                        style: GoogleFonts.inter(
+                          color: Colors.white38,
+                          fontSize: 11,
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
                       const SizedBox(height: 16),
+
                       SizedBox(
                         height: 48,
                         child: ElevatedButton(
@@ -375,6 +463,7 @@ class ManageRosterScreen extends StatelessWidget {
     );
 
     tagCtrl.dispose();
+    baseOvrCtrl.dispose();
   }
 
   @override
@@ -453,6 +542,12 @@ class ManageRosterScreen extends StatelessWidget {
                     }
                     if (tag.isNotEmpty) {
                       chips.add(_pill(text: tag, color: AppColors.tierGold));
+                    }
+                    if (a.individualBaseOvrOverride != null) {
+                      chips.add(_pill(
+                        text: 'BASE ${a.individualBaseOvrOverride}',
+                        color: const Color(0xFF22C55E),
+                      ));
                     }
 
                     final card = GlassCard(

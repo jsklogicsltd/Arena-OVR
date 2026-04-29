@@ -1,10 +1,17 @@
-import 'dart:math' as math;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../providers/firebase_provider.dart';
+import '../models/user_model.dart';
 
 /// All badge IDs matching asset filenames under `assets/badges/`.
 class BadgeIds {
   BadgeIds._();
+
+  // OVR headline tiers (must match athlete profile `UserModel.finalOvr`).
+  static const int ovrTierCountOnMeMin = 80;
+  static const int ovrTierLockedInMin = 86;
+  static const int ovrTierAlphaMin = 91;
+  static const int ovrTierGoldCardMin = 96;
+  static const int ovrTierChampionshipMin = 99;
 
   // Subjective tiers
   static const String countOnMe = 'count_on_me';
@@ -39,6 +46,107 @@ class BadgeIds {
         championshipRing,
       ];
 
+  /// Headline-OVR badges only (order matches [all]).
+  static const List<String> ovrHeadlineBadgeIds = [
+    countOnMe,
+    lockedIn,
+    alpha,
+    goldCard,
+    championshipRing,
+  ];
+
+  /// IDs unlocked purely by overall OVR ([finalOvr]) at or above each tier floor.
+  static List<String> ovrHeadlineUnlockedIds(int finalOvr) {
+    final o = finalOvr.clamp(0, 99);
+    final out = <String>[];
+    if (o >= ovrTierCountOnMeMin) out.add(countOnMe);
+    if (o >= ovrTierLockedInMin) out.add(lockedIn);
+    if (o >= ovrTierAlphaMin) out.add(alpha);
+    if (o >= ovrTierGoldCardMin) out.add(goldCard);
+    if (o >= ovrTierChampionshipMin) out.add(championshipRing);
+    return out;
+  }
+
+  /// Same Truck Stick + streak math as [BadgeRepository._evaluateBadges] (sections B–C).
+  /// [data] must include the same keys as a `users/` doc: `weightLbs`, `assessmentData`, `currentStreak`.
+  static List<String> streakTruckUnlockedIdsFromData(Map<String, dynamic> data) {
+    final earned = <String>[];
+
+    final weightLbs = _badgeNumVal(data, 'weightLbs');
+    final blob = data['assessmentData'] is Map
+        ? Map<String, dynamic>.from(data['assessmentData'] as Map)
+        : <String, dynamic>{};
+    final time40 = _badgeDoubleVal(blob, 'time40');
+
+    if (weightLbs > 0 && time40 > 0) {
+      final raw40 = weightLbs / (time40 * time40);
+      if (raw40 >= 10.0) earned.add(truckStick);
+    }
+
+    final streak = data['currentStreak'] is Map
+        ? Map<String, dynamic>.from(data['currentStreak'] as Map)
+        : <String, dynamic>{};
+
+    var maxStreak = 0;
+    for (final key in streak.keys) {
+      if (key.endsWith('_lastDate')) continue;
+      final v = streak[key];
+      if (v is int && v > maxStreak) maxStreak = v;
+    }
+
+    if (maxStreak >= 3) earned.add(streak3);
+    if (maxStreak >= 7) earned.add(streak7);
+    if (maxStreak >= 14) earned.add(streak14);
+    if (maxStreak >= 21) earned.add(streak21);
+    if (maxStreak >= 30) earned.add(streak30);
+
+    return earned;
+  }
+
+  /// User-doc fields needed for [streakTruckUnlockedIdsFromData] (aligned with [UserModel]).
+  static Map<String, dynamic> streakTruckEvalSlice(UserModel user) {
+    return {
+      'weightLbs': user.weightLbs,
+      'assessmentData': user.assessmentData ?? <String, dynamic>{},
+      'currentStreak': user.currentStreak,
+    };
+  }
+
+  /// Parses legacy feed copy `Earned the Count On Me badge!` → `count_on_me`.
+  static String? assetIdFromEarnedContent(String content) {
+    final m = RegExp(r'Earned the (.+?) badge').firstMatch(content.trim());
+    if (m == null) return null;
+    final label = m.group(1)?.trim();
+    if (label == null || label.isEmpty) return null;
+    for (final id in all) {
+      if (labelFor(id) == label) return id;
+    }
+    return null;
+  }
+
+  /// Trophy grid + detail screens: Firestore `badges` plus live OVR tiers + Truck/Streak from [user].
+  static List<String> trophyDisplayMerge(UserModel user) {
+    final merged = {
+      ...user.badges,
+      ...ovrHeadlineUnlockedIds(user.finalOvr),
+      ...streakTruckUnlockedIdsFromData(streakTruckEvalSlice(user)),
+    };
+    return all.where(merged.contains).toList();
+  }
+
+  static double _badgeNumVal(Map<String, dynamic> data, String key) {
+    final v = data[key];
+    if (v is num) return v.toDouble();
+    return 0;
+  }
+
+  static double _badgeDoubleVal(Map<String, dynamic> data, String key) {
+    final v = data[key];
+    if (v is num) return v.toDouble();
+    if (v is String) return double.tryParse(v) ?? 0;
+    return 0;
+  }
+
   static String labelFor(String id) {
     switch (id) {
       case countOnMe:
@@ -71,13 +179,13 @@ class BadgeIds {
   static String descriptionFor(String id) {
     switch (id) {
       case countOnMe:
-        return 'All 4 categories ≥ 80';
+        return 'Overall OVR reaches $ovrTierCountOnMeMin (80–85 band)';
       case lockedIn:
-        return 'All 4 categories ≥ 85';
+        return 'Overall OVR reaches $ovrTierLockedInMin (86–90 band)';
       case alpha:
-        return 'All 4 categories ≥ 90';
+        return 'Overall OVR reaches $ovrTierAlphaMin (91–95 band)';
       case goldCard:
-        return 'All 4 categories ≥ 95';
+        return 'Overall OVR reaches $ovrTierGoldCardMin (before 99)';
       case truckStick:
         return 'Elite power-to-speed ratio';
       case streak3:
@@ -115,7 +223,7 @@ class BadgeRepository {
     final List<String> currentBadges =
         data['badges'] != null ? List<String>.from(data['badges']) : [];
 
-    final earned = _evaluateBadges(data);
+    final earned = _evaluateBadges(data, athleteId);
 
     final toAward =
         earned.where((b) => !currentBadges.contains(b)).toList();
@@ -137,91 +245,20 @@ class BadgeRepository {
   }
 
   /// Pure evaluation — returns all badge IDs the athlete qualifies for right now.
-  List<String> _evaluateBadges(Map<String, dynamic> data) {
+  List<String> _evaluateBadges(Map<String, dynamic> data, String athleteId) {
     final List<String> earned = [];
 
-    final rating = data['currentRating'] is Map
-        ? Map<String, dynamic>.from(data['currentRating'] as Map)
-        : <String, dynamic>{};
+    final merged = Map<String, dynamic>.from(data);
+    merged['uid'] = athleteId;
+    final user = UserModel.fromJson(merged);
+    final int displayOvr = user.finalOvr;
 
-    // ── A. Subjective tier badges ──────────────────────────────────────────────
-    final comp = _ratingVal(rating, 'Athlete') +
-        _ratingVal(rating, 'Competitor') +
-        _ratingVal(rating, 'Performance');
-    final stu =
-        _ratingVal(rating, 'Student') + _ratingVal(rating, 'Class');
-    final tm =
-        _ratingVal(rating, 'Teammate') + _ratingVal(rating, 'Program');
-    final cit =
-        _ratingVal(rating, 'Citizen') + _ratingVal(rating, 'Standard');
+    // ── A. OVR headline tiers (aligned with profile / leaderboard `finalOvr`) ────
+    earned.addAll(BadgeIds.ovrHeadlineUnlockedIds(displayOvr));
 
-    final minSubjective = [comp, stu, tm, cit].reduce(math.min);
-
-    if (minSubjective >= 80) earned.add(BadgeIds.countOnMe);
-    if (minSubjective >= 85) earned.add(BadgeIds.lockedIn);
-    if (minSubjective >= 90) earned.add(BadgeIds.alpha);
-    if (minSubjective >= 95) earned.add(BadgeIds.goldCard);
-
-    // ── B. Truck Stick (physics) ───────────────────────────────────────────────
-    final weightLbs = _numVal(data, 'weightLbs');
-    final blob = data['assessmentData'] is Map
-        ? Map<String, dynamic>.from(data['assessmentData'] as Map)
-        : <String, dynamic>{};
-    final time40 = _doubleVal(blob, 'time40');
-
-    if (weightLbs > 0 && time40 > 0) {
-      final raw40 = weightLbs / (time40 * time40);
-      if (raw40 >= 10.0) earned.add(BadgeIds.truckStick);
-    }
-
-    // ── C. Streak badges ───────────────────────────────────────────────────────
-    final streak = data['currentStreak'] is Map
-        ? Map<String, dynamic>.from(data['currentStreak'] as Map)
-        : <String, dynamic>{};
-
-    int maxStreak = 0;
-    for (final key in streak.keys) {
-      if (key.endsWith('_lastDate')) continue;
-      final v = streak[key];
-      if (v is int && v > maxStreak) maxStreak = v;
-    }
-
-    if (maxStreak >= 3) earned.add(BadgeIds.streak3);
-    if (maxStreak >= 7) earned.add(BadgeIds.streak7);
-    if (maxStreak >= 14) earned.add(BadgeIds.streak14);
-    if (maxStreak >= 21) earned.add(BadgeIds.streak21);
-    if (maxStreak >= 30) earned.add(BadgeIds.streak30);
-
-    // ── D. Ultimate 99 OVR badge ───────────────────────────────────────────────
-    // Uses the same OVR fields as the app: prefer finalOvr (curve), then actualOvr, then ovr.
-    final int finalOvr = (data['finalOvr'] as num?)?.toInt() ?? 0;
-    final int actualOvr = (data['actualOvr'] as num?)?.toInt() ?? 0;
-    final int manualOvr = (data['ovr'] as num?)?.toInt() ?? 0;
-    final int currentOvr = (finalOvr > 0 ? finalOvr : (actualOvr > 0 ? actualOvr : manualOvr));
-    if (currentOvr >= 99) earned.add(BadgeIds.championshipRing);
+    earned.addAll(BadgeIds.streakTruckUnlockedIdsFromData(data));
 
     return earned;
-  }
-
-  // ── Helpers ────────────────────────────────────────────────────────────────────
-
-  double _ratingVal(Map<String, dynamic> rating, String key) {
-    final v = rating[key];
-    if (v is num) return v.toDouble();
-    return 0;
-  }
-
-  double _numVal(Map<String, dynamic> data, String key) {
-    final v = data[key];
-    if (v is num) return v.toDouble();
-    return 0;
-  }
-
-  double _doubleVal(Map<String, dynamic> data, String key) {
-    final v = data[key];
-    if (v is num) return v.toDouble();
-    if (v is String) return double.tryParse(v) ?? 0;
-    return 0;
   }
 
   Future<void> _awardBadge({
@@ -246,9 +283,11 @@ class BadgeRepository {
       'teamId': teamId,
       'schoolId': schoolId,
       'type': 'BADGE',
-      'actorName': 'System',
+      // Coach feed / dashboards show actorName — use the athlete who earned it (not "System").
+      'actorName': athleteName,
       'targetName': athleteName,
       'content': 'Earned the $label badge!',
+      'badgeId': badgeName,
       'isPinned': false,
       'createdAt': FieldValue.serverTimestamp(),
     });

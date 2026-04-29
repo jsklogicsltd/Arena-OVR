@@ -5,7 +5,6 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 
 import 'leaderboard_controller.dart';
-import '../player/player_controller.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/widgets/stadium_background.dart';
 import '../../core/components/animated_glowing_border.dart';
@@ -14,15 +13,6 @@ import '../../data/models/user_model.dart';
 
 class LeaderboardView extends GetView<LeaderboardController> {
   const LeaderboardView({Key? key}) : super(key: key);
-
-  PlayerController? _tryPlayerController() {
-    if (!Get.isRegistered<PlayerController>()) return null;
-    try {
-      return Get.find<PlayerController>();
-    } catch (_) {
-      return null;
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -36,24 +26,6 @@ class LeaderboardView extends GetView<LeaderboardController> {
               _buildAppBar(context),
               Expanded(
                 child: Obx(() {
-                  final pc = _tryPlayerController();
-                  if (pc != null && pc.athlete.value?.role == 'athlete') {
-                    // Rebuild when season / profile loads (same as athlete dashboard OVR gate).
-                    pc.athlete.value;
-                    pc.season.value;
-                    if (!pc.isOvrTimingReady) {
-                      return _buildAthleteLeaderboardGate(
-                        loading: true,
-                        pc: pc,
-                      );
-                    }
-                    if (!pc.isOvrRevealed) {
-                      return _buildAthleteLeaderboardGate(
-                        loading: false,
-                        pc: pc,
-                      );
-                    }
-                  }
                   if (controller.isLoading.value && controller.ranked.isEmpty) {
                     return const Center(
                       child: CircularProgressIndicator(
@@ -67,93 +39,6 @@ class LeaderboardView extends GetView<LeaderboardController> {
             ],
           ),
         ],
-      ),
-    );
-  }
-
-  /// Before OVR is revealed (locked window / syncing): no tabs, no ranks, no faces, no OVR — matches athlete policy.
-  Widget _buildAthleteLeaderboardGate({
-    required bool loading,
-    required PlayerController pc,
-  }) {
-    return Center(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            if (loading) ...[
-              const SizedBox(
-                width: 36,
-                height: 36,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2.5,
-                  color: AppColors.tierGold,
-                ),
-              ),
-              const SizedBox(height: 28),
-              Text(
-                'SYNCING LEADERBOARD…',
-                textAlign: TextAlign.center,
-                style: GoogleFonts.spaceGrotesk(
-                  color: AppColors.textSecondary,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 1.0,
-                ),
-              ),
-            ] else ...[
-              Icon(
-                Icons.lock_outline_rounded,
-                color: AppColors.textSecondary,
-                size: 52,
-              ),
-              const SizedBox(height: 20),
-              Text(
-                'LEADERBOARD LOCKED',
-                textAlign: TextAlign.center,
-                style: GoogleFonts.spaceGrotesk(
-                  color: Colors.white,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 1.0,
-                ),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                pc.capStatusLabel,
-                textAlign: TextAlign.center,
-                style: GoogleFonts.spaceGrotesk(
-                  color: AppColors.textSecondary,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                pc.phaseName,
-                textAlign: TextAlign.center,
-                style: GoogleFonts.spaceGrotesk(
-                  color: AppColors.seasonGold,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 1.2,
-                ),
-              ),
-              const SizedBox(height: 24),
-              Text(
-                'Rankings and OVR unlock when your season OVR is revealed.',
-                textAlign: TextAlign.center,
-                style: GoogleFonts.spaceGrotesk(
-                  color: Colors.white54,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                  height: 1.35,
-                ),
-              ),
-            ],
-          ],
-        ),
       ),
     );
   }
@@ -813,6 +698,7 @@ class LeaderboardView extends GetView<LeaderboardController> {
     final leader = e.leader;
     final isElite =
         leader != null && EliteOvrStyle.isEliteOvr(leader.coachVisibleOvr);
+    const eliteReadable = Color(0xFF0B1A2A);
     final hasLeader = leader != null;
     const avatarSize = 40.0;
 
@@ -872,16 +758,22 @@ class LeaderboardView extends GetView<LeaderboardController> {
                         height: 22,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          color: e.accent.withValues(alpha: 0.14),
+                          color: isElite
+                              ? eliteReadable.withValues(alpha: 0.12)
+                              : e.accent.withValues(alpha: 0.14),
                         ),
-                        child: Icon(e.icon, color: e.accent, size: 12),
+                        child: Icon(
+                          e.icon,
+                          color: isElite ? eliteReadable : e.accent,
+                          size: 12,
+                        ),
                       ),
                       const SizedBox(width: 5),
                       Expanded(
                         child: Text(
                           e.title,
                           style: GoogleFonts.spaceGrotesk(
-                            color: e.accent,
+                            color: isElite ? eliteReadable : e.accent,
                             fontSize: 9,
                             fontWeight: FontWeight.w800,
                             letterSpacing: 0.9,
@@ -985,7 +877,7 @@ class LeaderboardView extends GetView<LeaderboardController> {
                   Text(
                     hasLeader ? _shortName(leader.name) : '--',
                     style: GoogleFonts.spaceGrotesk(
-                      color: Colors.white,
+                      color: isElite ? eliteReadable : Colors.white,
                       fontSize: 11,
                       fontWeight: FontWeight.w700,
                       height: 1.1,
@@ -1002,7 +894,7 @@ class LeaderboardView extends GetView<LeaderboardController> {
                       Text(
                         e.displayValue,
                         style: GoogleFonts.spaceGrotesk(
-                          color: isElite ? const Color(0xFFFFD700) : e.accent,
+                          color: isElite ? eliteReadable : e.accent,
                           fontSize: 15,
                           fontWeight: FontWeight.w800,
                           height: 1.1,
@@ -1013,7 +905,7 @@ class LeaderboardView extends GetView<LeaderboardController> {
                         e.suffix,
                         style: GoogleFonts.spaceGrotesk(
                           color: (isElite
-                                  ? const Color(0xFFFFD700)
+                                  ? eliteReadable
                                   : e.accent)
                               .withValues(alpha: 0.55),
                           fontSize: 8,

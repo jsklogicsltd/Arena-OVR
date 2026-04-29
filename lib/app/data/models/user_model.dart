@@ -16,6 +16,9 @@ class UserModel {
   final String? customTag;
   final String? fcmToken;
   final Map<String, dynamic> currentRating;
+  /// Raw (unclamped) subjective transaction sums per bucket.
+  /// Keys: Athlete, Student, Teammate, Citizen.  Values: int (actual awarded pts).
+  final Map<String, dynamic> rawBucketPoints;
   final int ovr; // 0-99
   final int? actualOvr;
   final int? ovrDay;
@@ -44,6 +47,13 @@ class UserModel {
   /// This is the single source of truth for display + leaderboards.
   final int? finalOvrValue;
 
+  /// Per-athlete starting-OVR override (e.g. dual-sport athletes who arrive
+  /// with a higher locked-in baseline than the rest of the team).
+  ///
+  /// When `null`, the engine falls back to the team's `startingOvrBaseline`.
+  /// When set, it must be in `[0, 90]` (clamped on read/write).
+  final int? individualBaseOvrOverride;
+
   UserModel({
     required this.uid,
     required this.email,
@@ -59,6 +69,7 @@ class UserModel {
     this.customTag,
     this.fcmToken,
     this.currentRating = const {},
+    this.rawBucketPoints = const {},
     this.ovr = 0,
     this.actualOvr,
     this.ovrDay,
@@ -80,6 +91,7 @@ class UserModel {
     this.automatedOvr,
     this.assessmentData,
     this.finalOvrValue,
+    this.individualBaseOvrOverride,
   });
 
   /// Final OVR used everywhere in UI.
@@ -156,6 +168,7 @@ class UserModel {
     String? customTag,
     String? fcmToken,
     Map<String, dynamic>? currentRating,
+    Map<String, dynamic>? rawBucketPoints,
     int? ovr,
     int? actualOvr,
     int? ovrDay,
@@ -177,6 +190,7 @@ class UserModel {
     int? automatedOvr,
     Map<String, dynamic>? assessmentData,
     int? finalOvrValue,
+    int? individualBaseOvrOverride,
   }) {
     return UserModel(
       uid: uid ?? this.uid,
@@ -193,6 +207,7 @@ class UserModel {
       customTag: customTag ?? this.customTag,
       fcmToken: fcmToken ?? this.fcmToken,
       currentRating: currentRating ?? this.currentRating,
+      rawBucketPoints: rawBucketPoints ?? this.rawBucketPoints,
       ovr: ovr ?? this.ovr,
       actualOvr: actualOvr ?? this.actualOvr,
       ovrDay: ovrDay ?? this.ovrDay,
@@ -214,6 +229,8 @@ class UserModel {
       automatedOvr: automatedOvr ?? this.automatedOvr,
       assessmentData: assessmentData ?? this.assessmentData,
       finalOvrValue: finalOvrValue ?? this.finalOvrValue,
+      individualBaseOvrOverride:
+          individualBaseOvrOverride ?? this.individualBaseOvrOverride,
     );
   }
 
@@ -233,6 +250,7 @@ class UserModel {
       customTag: json['customTag'],
       fcmToken: json['fcmToken'],
       currentRating: json['currentRating'] != null ? Map<String, dynamic>.from(json['currentRating']) : {},
+      rawBucketPoints: json['rawBucketPoints'] != null ? Map<String, dynamic>.from(json['rawBucketPoints']) : {},
       ovr: json['ovr'] ?? 0,
       actualOvr: json['actualOvr'],
       ovrDay: json['ovrDay'],
@@ -256,6 +274,9 @@ class UserModel {
           ? Map<String, dynamic>.from(json['assessmentData'])
           : null,
       finalOvrValue: (json['finalOvr'] as num?)?.toInt(),
+      individualBaseOvrOverride: (json['individualBaseOvrOverride'] as num?)
+          ?.toInt()
+          .clamp(0, 90),
     );
   }
 
@@ -275,6 +296,7 @@ class UserModel {
       'customTag': customTag,
       'fcmToken': fcmToken,
       'currentRating': currentRating,
+      'rawBucketPoints': rawBucketPoints,
       'ovr': ovr,
       'actualOvr': actualOvr,
       'ovrDay': ovrDay,
@@ -296,6 +318,7 @@ class UserModel {
       'automatedOvr': automatedOvr,
       'assessmentData': assessmentData,
       'finalOvr': finalOvrValue,
+      'individualBaseOvrOverride': individualBaseOvrOverride,
     };
   }
 }
