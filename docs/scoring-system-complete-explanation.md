@@ -34,9 +34,10 @@ It supports:
 5. Scaled buckets are averaged into `manualOvr`.
 6. Objective numbers are calculated from tier tables.
 7. Subjective + objective combine into a single decimal score (50/50).
-8. Team-wide curve converts combined score into `curveOvr`.
-9. **Top Dawg gating hierarchy** caps elite tiers where subjective is lacking.
-10. Final OVR is saved as `finalOvr` and displayed in app.
+8. **Incomplete Profile gate** checks both pillars are present.
+9. Team-wide curve converts combined score into `curveOvr` (complete athletes only).
+10. **Top Dawg gating hierarchy** caps elite tiers where subjective is lacking.
+11. Final OVR is saved as `finalOvr` and displayed in app.
 
 ---
 
@@ -300,6 +301,21 @@ The top combined score on the roster defines the reference point; everyone else 
 
 ### Formula
 
+First, the engine applies the completeness rule:
+
+\[
+\text{isComplete} = (\text{assessmentValue} > 0) \land (\text{manualInputValue} > 0)
+\]
+
+- If `isComplete == false`: athlete is hard-locked to own baseline and excluded from benchmark.
+- If `isComplete == true`: athlete participates in curve.
+
+Benchmark is computed from complete athletes only:
+
+\[
+highestCombined = \max(\text{combined scores where isComplete = true})
+\]
+
 For athlete \(i\):
 
 \[
@@ -313,7 +329,7 @@ curveOvr_i = clamp\left(baseline_i + \lceil raw_i \rceil,\ baseline_i,\ cap\righ
 Current implementation sets:
 - `cap = 99` (phase throttling currently disabled)
 
-If `highestCombined <= 0`, everyone returns exactly to own baseline.
+If `highestCombined <= 0` (e.g., Day 1 with all incomplete profiles), everyone returns exactly to own baseline.
 
 ### Curve example
 
@@ -333,6 +349,12 @@ Assume baseline 60, cap 99, highestCombined = 46.3.
   \[
   raw=0,\quad curveOvr=60
   \]
+
+### Incomplete profile examples
+
+- Athlete with objective present but subjective missing (`assessmentValue > 0`, `manualInputValue = 0`) → baseline lock.
+- Athlete with subjective present but objective missing (`assessmentValue = 0`, `manualInputValue > 0`) → baseline lock.
+- Neither athlete can set `highestCombined`.
 
 ---
 
@@ -523,12 +545,32 @@ If curveOvr was 70, finalOvr stays **70** (min preserves lower values).
 
 ---
 
+## 9. Season Rollover Logic (Current)
+
+When a new season starts:
+
+- **Subjective resets to fresh baseline context**
+  - `rawBucketPoints` cleared
+  - `currentRating` cleared
+  - `ratingCount` reset
+  - `ovr`, `actualOvr`, `finalOvr` reset to baseline
+
+- **Objective persists**
+  - `assessmentData` is carried forward from prior season so testing data remains until coaches update/retest.
+
+- **Badges**
+  - Arena gameplay badges reset for the new season cycle.
+  - Non-Arena/meta badges are preserved.
+
+---
+
 ## Practical Summary for Coaches
 
 - **Baseline** is the athlete's floor — they can never drop below it.
 - **Objective and subjective each control half** of the combined score.
 - **Team curve** makes OVR relative, not isolated — one player's gain can shift everyone.
 - **Top Dawg scoring** means each subjective category is relative to the team's best in that category. The team leader in a category always gets 99 for that bucket.
+- **Incomplete profile rule**: athletes must have both objective and subjective contributions to move above baseline.
 - **Zero Category Cap (84)**: if an athlete has zero points in ANY category, they cannot reach 85+. This encourages participation across all 4 pillars.
 - **Subjective 80 Gate (89)**: even if objective scores are elite, the subjective average must be 80+ to enter the 90+ tier.
 - **Final displayed OVR** is the gated curved result (`finalOvr`).

@@ -458,18 +458,35 @@ List<PlayerRating> assignOverallRatingsFromCombinedScore(
   int startingOvrBaseline = 50,
   Map<String, int>? baselineByAthlete,
   Map<String, SubjectiveBucketScores>? bucketScoresByAthlete,
+  Map<String, double>? objectiveValueByAthlete,
+  Map<String, double>? manualInputValueByAthlete,
 }) {
   if (combinedScores.isEmpty) return [];
 
   final teamBaseline = startingOvrBaseline.clamp(0, 90);
   final int cap = phaseCap(phase, startingOvrBaseline: teamBaseline);
-  final double highest = combinedScores.values.reduce(max);
 
   int baselineFor(String id) {
     final v = baselineByAthlete?[id];
     if (v == null) return teamBaseline;
     return v.clamp(0, 90);
   }
+
+  bool hasCompleteProfile(String id) {
+    // Incomplete Profile Gate:
+    // athletes must have both pillars > 0 to be curve-eligible.
+    final objective = (objectiveValueByAthlete?[id] ?? 0);
+    final subjective = (manualInputValueByAthlete?[id] ?? 0);
+    return objective > 0 && subjective > 0;
+  }
+
+  final eligibleCombined = <double>[];
+  for (final e in combinedScores.entries) {
+    if (!hasCompleteProfile(e.key)) continue;
+    final score = e.value;
+    if (score > 0) eligibleCombined.add(score);
+  }
+  final double highest = eligibleCombined.isEmpty ? 0 : eligibleCombined.reduce(max);
 
   if (highest <= 0) {
     return combinedScores.entries
@@ -484,8 +501,20 @@ List<PlayerRating> assignOverallRatingsFromCombinedScore(
 
   return combinedScores.entries.map((e) {
     final id = e.key;
-    final double score = e.value <= 0 ? 0 : e.value;
     final int athleteBaseline = baselineFor(id);
+    final isEligible = hasCompleteProfile(id);
+
+    // Incomplete profiles stay locked to baseline and do not participate
+    // in setting the roster curve.
+    if (!isEligible) {
+      return PlayerRating(
+        playerId: id,
+        topPerformancePoints: e.value.round(),
+        overallRating: athleteBaseline,
+      );
+    }
+
+    final double score = e.value <= 0 ? 0 : e.value;
     // Curve scales the leader to [cap]. Each athlete is floored at their own
     // baseline so per-athlete overrides cannot drag someone below their
     // locked-in starting OVR.

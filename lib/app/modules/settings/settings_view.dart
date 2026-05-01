@@ -10,6 +10,7 @@ import '../../core/constants/app_colors.dart';
 import '../../core/widgets/stadium_background.dart';
 import '../../core/components/animated_glowing_border.dart';
 import '../../data/models/user_model.dart';
+import '../../routes/app_routes.dart';
 
 class SettingsView extends GetView<SettingsController> {
   const SettingsView({Key? key}) : super(key: key);
@@ -720,6 +721,12 @@ class SettingsView extends GetView<SettingsController> {
   Widget _buildAccountCard(BuildContext context) {
     return _buildGlassCard(
       children: [
+        _buildActionRow(
+          'FAQ',
+          Icons.help_outline_rounded,
+          () => Get.toNamed(Routes.FAQ),
+        ),
+        Divider(height: 24, color: Colors.white.withValues(alpha: 0.1)),
         _buildActionRow('Change Password', Icons.chevron_right_rounded, () => controller.changePassword(context)),
         Divider(height: 24, color: Colors.white.withValues(alpha: 0.1)),
         _buildActionRow('Log Out', Icons.logout_rounded, () {

@@ -1085,6 +1085,8 @@ class CoachController extends GetxController {
         .get();
 
     final combinedByAthlete = <String, double>{};
+    final objectiveByAthlete = <String, double>{};
+    final manualByAthlete = <String, double>{};
     final baselineByAthlete = <String, int>{};
     for (final d in rosterSnap.docs) {
       final data = d.data();
@@ -1113,6 +1115,8 @@ class CoachController extends GetxController {
         manualOvr: manual,
         baseline: athleteBaseline,
       );
+      objectiveByAthlete[uid] = av;
+      manualByAthlete[uid] = mv;
       combinedByAthlete[uid] =
           combinedScore(assessmentValue: av, manualInputValue: mv);
       final overrideVal = a.individualBaseOvrOverride;
@@ -1181,6 +1185,8 @@ class CoachController extends GetxController {
       startingOvrBaseline: startingOvrBaseline,
       baselineByAthlete: baselineByAthlete,
       bucketScoresByAthlete: bucketScoresByAthlete,
+      objectiveValueByAthlete: objectiveByAthlete,
+      manualInputValueByAthlete: manualByAthlete,
     );
 
     // Persist: finalOvr (single source of truth)

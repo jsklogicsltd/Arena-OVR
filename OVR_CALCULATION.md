@@ -208,7 +208,31 @@ Where:
 - `assessmentValue` = objective half (0..49.5)
 - `manualInputValue` = subjective half above baseline (0..49.5)
 
+### Incomplete Profile Gate (current production rule)
+
+Before curve scaling, each athlete is checked for profile completeness:
+
+\[
+\text{isComplete} = (\text{assessmentValue} > 0) \land (\text{manualInputValue} > 0)
+\]
+
+Rules:
+- If `isComplete == false` (missing either objective or subjective), athlete is **hard-locked** to baseline:
+
+\[
+finalOvr = baseline
+\]
+
+- Incomplete athletes are **excluded** from setting curve benchmark (`highestCombined`).
+- This prevents Day-1 spikes from partial data (e.g., objective only or subjective only).
+
 ### Curve (team-relative scaling)
+
+Only **complete** athletes participate in curve benchmark:
+
+\[
+highestCombined = \max(\text{combinedScore of complete athletes only})
+\]
 
 For athlete \(i\):
 
@@ -221,6 +245,10 @@ curveOvr_i = clamp(baseline_i + \lceil raw_i \rceil, \ baseline_i, \ cap)
 \]
 
 Current implementation: `cap = 99` (phase throttling disabled).
+
+If no complete athlete exists (all incomplete):
+- `highestCombined` resolves safely to `0`
+- everyone remains exactly at baseline (no divide-by-zero path).
 
 ### Top Dawg Gating Hierarchy (replaces old milestone gates)
 
@@ -254,11 +282,32 @@ After gating, `finalOvr` is clamped to never drop below the athlete's own baseli
 
 ---
 
+## 4) Season Rollover Behavior (current logic)
+
+When a coach starts/resets a season:
+
+- **Subjective resets**
+  - `rawBucketPoints` → empty map
+  - `currentRating` → empty map
+  - `ratingCount` → 0
+  - `ovr` / `actualOvr` / `finalOvr` → baseline
+
+- **Objective persists**
+  - `assessmentData` is carried forward from previous season
+  - this keeps squat/bench/speed/GPA-derived numbers until coach retests
+
+- **Badges**
+  - Arena gameplay badges reset
+  - non-Arena/meta badges are preserved
+
+---
+
 ## Quick Cheat-Sheet
 
 - **Manual points buckets**: sum season transactions (unclamped) → Top Dawg pre-pass finds max per category → each bucket scaled 0–99 relative to team leader → average of 4 buckets = manualOvr.
 - **Assessments**: raw event → PP(30..99) → power/speed numbers (ceil averages) → assessmentValue (0..49.5).
 - **Combined**: assessmentValue + manualInputValue (above-baseline contribution × 0.5).
-- **Curve**: highest combined on roster → cap; everyone else proportional.
+- **Incomplete Profile Gate**: objective > 0 AND subjective > 0 required to be curve-eligible; otherwise baseline lock.
+- **Curve**: highest combined of complete athletes only → cap; complete athletes scale proportionally.
 - **Gates**: zero-bucket → cap 84; manualOvr < 80 and curveOvr ≥ 90 → cap 89; otherwise full OVR.
 - **Final OVR**: gated curved result, displayed as `finalOvr`.

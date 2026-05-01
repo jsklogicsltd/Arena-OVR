@@ -56,13 +56,6 @@ android {
         }
     }
 
-    // Some third-party .so binaries fail strip on specific NDK/toolchain combos.
-    // Keep symbols as a release-build fallback so appbundle still succeeds.
-    packaging {
-        jniLibs {
-            keepDebugSymbols += setOf("**/*.so")
-        }
-    }
 }
 
 flutter {

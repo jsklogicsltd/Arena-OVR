@@ -16,6 +16,7 @@ class AppColors {
   static const Color tierSilver = Color(0xFFC0C0C0);
   static const Color tierGold = Color(0xFFFFB800);
   static const Color tierBlue = Color(0xFF00AAFF);
+  static const Color tierGreen = Color(0xFF22C55E);
   static const Color tierDiamond = Color(0xFF00FFFF);
 
   static const Color seasonGold = Color(0xFFFFD700);
@@ -24,8 +25,10 @@ class AppColors {
     if (ovr == null) return textSecondary;
     if (ovr < 30) return tierBronze;
     if (ovr < 60) return tierSilver;
-    if (ovr < 80) return tierGold;
-    if (ovr < 95) return tierBlue;
-    return tierDiamond;
+    if (ovr < 80) return tierGreen;
+    // Client rule: 80..89 must always render as blue.
+    if (ovr <= 89) return tierBlue;
+    // 90..98 should render gold; 99 special-card handling is separate.
+    return tierGold;
   }
 }

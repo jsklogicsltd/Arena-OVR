@@ -30,6 +30,7 @@ import "../modules/badges/badges_view.dart";
 import "../modules/badges/badges_controller.dart";
 import "../modules/settings/settings_view.dart";
 import "../modules/settings/settings_controller.dart";
+import "../modules/settings/faq_view.dart";
 import "../modules/coach/views/create_team_view.dart";
 import "../modules/coach/views/team_settings_view.dart";
 import "../modules/coach/views/season_view.dart";
@@ -61,6 +62,7 @@ class AppPages {
     GetPage(name: Routes.NOTIFICATIONS, page: () => const NotificationsView(), binding: BindingsBuilder(() { Get.lazyPut<NotificationsController>(() => NotificationsController()); })),
     GetPage(name: Routes.BADGES, page: () => const BadgesView(), binding: BindingsBuilder(() { Get.lazyPut<BadgesController>(() => BadgesController()); })),
     GetPage(name: Routes.SETTINGS, page: () => const SettingsView(), binding: BindingsBuilder(() { Get.lazyPut<SettingsController>(() => SettingsController()); })),
+    GetPage(name: Routes.FAQ, page: () => const FaqView()),
     GetPage(
       name: Routes.CREATE_TEAM,
       page: () => const CreateTeamView(),

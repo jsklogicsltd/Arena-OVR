@@ -5,6 +5,7 @@ class UserModel {
   final String email;
   final String name;
   final String? profilePicUrl;
+
   /// [superadmin] | [athlete] | legacy [coach] | [Head Coach] | [Assistant Coach]
   final String role;
   final String? schoolId;
@@ -16,6 +17,7 @@ class UserModel {
   final String? customTag;
   final String? fcmToken;
   final Map<String, dynamic> currentRating;
+
   /// Raw (unclamped) subjective transaction sums per bucket.
   /// Keys: Athlete, Student, Teammate, Citizen.  Values: int (actual awarded pts).
   final Map<String, dynamic> rawBucketPoints;
@@ -29,6 +31,9 @@ class UserModel {
   final bool hasUploadedPic;
   final Map<String, dynamic> currentStreak;
   final int dailyPoints;
+
+  /// Total subjective rating transactions this season (used for badge gating).
+  final int ratingCount;
   final DateTime? lastPointDate;
   final DateTime? createdAt;
   final DateTime? lastActiveAt;
@@ -43,6 +48,7 @@ class UserModel {
   // Automated assessment results
   final int? automatedOvr;
   final Map<String, dynamic>? assessmentData;
+
   /// Final roster-relative OVR computed by the combined 50/50 curve engine.
   /// This is the single source of truth for display + leaderboards.
   final int? finalOvrValue;
@@ -80,6 +86,7 @@ class UserModel {
     this.hasUploadedPic = false,
     this.currentStreak = const {},
     this.dailyPoints = 0,
+    this.ratingCount = 0,
     this.lastPointDate,
     this.createdAt,
     this.lastActiveAt,
@@ -103,8 +110,10 @@ class UserModel {
   int get finalOvr {
     final curve = finalOvrValue;
     if (curve != null) return curve.clamp(0, 99);
-    return ((actualOvr != null && actualOvr! > 0) ? actualOvr! : ovr)
-        .clamp(0, 99);
+    return ((actualOvr != null && actualOvr! > 0) ? actualOvr! : ovr).clamp(
+      0,
+      99,
+    );
   }
 
   /// OVR always visible to coaches — uses [finalOvr] (curve from objective + subjective).
@@ -179,6 +188,7 @@ class UserModel {
     bool? hasUploadedPic,
     Map<String, dynamic>? currentStreak,
     int? dailyPoints,
+    int? ratingCount,
     DateTime? lastPointDate,
     DateTime? createdAt,
     DateTime? lastActiveAt,
@@ -218,6 +228,7 @@ class UserModel {
       hasUploadedPic: hasUploadedPic ?? this.hasUploadedPic,
       currentStreak: currentStreak ?? this.currentStreak,
       dailyPoints: dailyPoints ?? this.dailyPoints,
+      ratingCount: ratingCount ?? this.ratingCount,
       lastPointDate: lastPointDate ?? this.lastPointDate,
       createdAt: createdAt ?? this.createdAt,
       lastActiveAt: lastActiveAt ?? this.lastActiveAt,
@@ -243,14 +254,20 @@ class UserModel {
       role: json['role'] ?? 'athlete',
       schoolId: json['schoolId'],
       teamId: json['teamId'],
-      teamIds: json['teamIds'] != null ? List<String>.from(json['teamIds']) : [],
+      teamIds: json['teamIds'] != null
+          ? List<String>.from(json['teamIds'])
+          : [],
       activeTeamId: json['activeTeamId'],
       jerseyNumber: json['jerseyNumber']?.toString(),
       positionGroup: json['positionGroup'],
       customTag: json['customTag'],
       fcmToken: json['fcmToken'],
-      currentRating: json['currentRating'] != null ? Map<String, dynamic>.from(json['currentRating']) : {},
-      rawBucketPoints: json['rawBucketPoints'] != null ? Map<String, dynamic>.from(json['rawBucketPoints']) : {},
+      currentRating: json['currentRating'] != null
+          ? Map<String, dynamic>.from(json['currentRating'])
+          : {},
+      rawBucketPoints: json['rawBucketPoints'] != null
+          ? Map<String, dynamic>.from(json['rawBucketPoints'])
+          : {},
       ovr: json['ovr'] ?? 0,
       actualOvr: json['actualOvr'],
       ovrDay: json['ovrDay'],
@@ -259,11 +276,20 @@ class UserModel {
       previousRank: json['previousRank'],
       badges: json['badges'] != null ? List<String>.from(json['badges']) : [],
       hasUploadedPic: json['hasUploadedPic'] ?? false,
-      currentStreak: json['currentStreak'] != null ? Map<String, dynamic>.from(json['currentStreak']) : {},
+      currentStreak: json['currentStreak'] != null
+          ? Map<String, dynamic>.from(json['currentStreak'])
+          : {},
       dailyPoints: (json['dailyPoints'] as num?)?.toInt() ?? 0,
-      lastPointDate: json['lastPointDate'] != null ? (json['lastPointDate'] as Timestamp).toDate() : null,
-      createdAt: json['createdAt'] != null ? (json['createdAt'] as Timestamp).toDate() : null,
-      lastActiveAt: json['lastActiveAt'] != null ? (json['lastActiveAt'] as Timestamp).toDate() : null,
+      ratingCount: (json['ratingCount'] as num?)?.toInt() ?? 0,
+      lastPointDate: json['lastPointDate'] != null
+          ? (json['lastPointDate'] as Timestamp).toDate()
+          : null,
+      createdAt: json['createdAt'] != null
+          ? (json['createdAt'] as Timestamp).toDate()
+          : null,
+      lastActiveAt: json['lastActiveAt'] != null
+          ? (json['lastActiveAt'] as Timestamp).toDate()
+          : null,
       grade: json['grade'] as int?,
       heightInches: json['heightInches'] as int?,
       weightLbs: json['weightLbs'] as int?,
@@ -307,9 +333,14 @@ class UserModel {
       'hasUploadedPic': hasUploadedPic,
       'currentStreak': currentStreak,
       'dailyPoints': dailyPoints,
-      'lastPointDate': lastPointDate != null ? Timestamp.fromDate(lastPointDate!) : null,
+      'ratingCount': ratingCount,
+      'lastPointDate': lastPointDate != null
+          ? Timestamp.fromDate(lastPointDate!)
+          : null,
       'createdAt': createdAt != null ? Timestamp.fromDate(createdAt!) : null,
-      'lastActiveAt': lastActiveAt != null ? Timestamp.fromDate(lastActiveAt!) : null,
+      'lastActiveAt': lastActiveAt != null
+          ? Timestamp.fromDate(lastActiveAt!)
+          : null,
       'grade': grade,
       'heightInches': heightInches,
       'weightLbs': weightLbs,

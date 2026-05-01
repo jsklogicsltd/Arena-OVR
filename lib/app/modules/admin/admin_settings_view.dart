@@ -9,6 +9,7 @@ import '../../core/widgets/stadium_background.dart';
 import '../../core/widgets/glass_card.dart';
 import '../../core/components/animated_glowing_border.dart';
 import '../../core/utils/change_password_helper.dart';
+import '../../routes/app_routes.dart';
 import 'admin_controller.dart';
 
 class AdminSettingsView extends GetView<AdminController> {
@@ -385,6 +386,15 @@ class AdminSettingsView extends GetView<AdminController> {
                         padding: EdgeInsets.zero,
                         child: Column(
                           children: [
+                            _buildListTile(
+                              Icons.help_outline_rounded,
+                              'FAQ',
+                              onTap: () => Get.toNamed(Routes.FAQ),
+                            ),
+                            Divider(
+                              color: Colors.white.withValues(alpha: 0.1),
+                              height: 1,
+                            ),
                             _buildListTile(
                               Icons.lock_outline,
                               'Change Password',

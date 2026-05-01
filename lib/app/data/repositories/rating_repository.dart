@@ -11,7 +11,10 @@ class RatingRepository {
   final BadgeRepository _badgeRepo = BadgeRepository();
 
   Future<void> awardRating(TransactionModel transaction) async {
-    await _provider.firestore.collection('transactions').doc(transaction.id).set(transaction.toJson());
+    await _provider.firestore
+        .collection('transactions')
+        .doc(transaction.id)
+        .set(transaction.toJson());
   }
 
   Future<List<TransactionModel>> getAthleteHistory(
@@ -25,16 +28,24 @@ class RatingRepository {
       q = q.where('seasonId', isEqualTo: seasonId);
     }
     final snapshot = await q.orderBy('createdAt', descending: true).get();
-    return snapshot.docs.map((doc) => TransactionModel.fromJson(doc.data())).toList();
+    return snapshot.docs
+        .map((doc) => TransactionModel.fromJson(doc.data()))
+        .toList();
   }
 
   Future<void> recalculateOvr(String teamId, String seasonId) async {
-    final seasonDoc = await _provider.firestore.collection('seasons').doc(seasonId).get();
+    final seasonDoc = await _provider.firestore
+        .collection('seasons')
+        .doc(seasonId)
+        .get();
     if (!seasonDoc.exists || seasonDoc.data() == null) return;
-    
+
     final season = SeasonModel.fromJson(seasonDoc.data()!);
     final startDate = season.startDate ?? DateTime.now();
-    final teamDoc = await _provider.firestore.collection('teams').doc(teamId).get();
+    final teamDoc = await _provider.firestore
+        .collection('teams')
+        .doc(teamId)
+        .get();
     final teamData = teamDoc.data() ?? const <String, dynamic>{};
     final seasonLengthDays =
         ((teamData['seasonLengthDays'] ?? season.seasonLengthDays) as num)
@@ -45,27 +56,32 @@ class RatingRepository {
             .toInt()
             .clamp(0, 90);
 
-    final athletesSnap = await _provider.firestore.collection('users')
+    final athletesSnap = await _provider.firestore
+        .collection('users')
         .where('teamId', isEqualTo: teamId)
         .where('role', isEqualTo: 'athlete')
         .get();
 
-    final txSnapshot = await _provider.firestore.collection('transactions')
+    final txSnapshot = await _provider.firestore
+        .collection('transactions')
         .where('teamId', isEqualTo: teamId)
         .where('seasonId', isEqualTo: seasonId)
         .where('isArchived', isEqualTo: false)
         .get();
 
     final Map<String, Map<String, double>> stats = {};
+    final Map<String, int> txCount = {}; // per-athlete transaction count
     for (var doc in athletesSnap.docs) {
       stats[doc.id] = {'ath': 0, 'stu': 0, 'tm': 0, 'cit': 0, 'raw': 0};
+      txCount[doc.id] = 0;
     }
 
     for (var doc in txSnapshot.docs) {
       final t = TransactionModel.fromJson(doc.data());
       final aId = t.athleteId;
       if (!stats.containsKey(aId)) continue;
-      
+      txCount[aId] = (txCount[aId] ?? 0) + 1;
+
       switch (t.category.toLowerCase()) {
         case 'athlete':
         case 'competitor':
@@ -95,7 +111,7 @@ class RatingRepository {
     // leader in each category is identified correctly.
 
     final batch = _provider.firestore.batch();
-    
+
     int totalOvr = 0;
     int ratedAthletes = 0;
 
@@ -111,8 +127,7 @@ class RatingRepository {
       };
     }
 
-    final topDawgScores =
-        curve.computeTopDawgSubjectiveScores(rosterBucketRaw);
+    final topDawgScores = curve.computeTopDawgSubjectiveScores(rosterBucketRaw);
 
     for (var doc in athletesSnap.docs) {
       final aId = doc.id;
@@ -129,18 +144,20 @@ class RatingRepository {
         'ovrDay': null,
         'ovrCap': null,
         'currentRating': {
-            'Athlete': buckets.athleteScore,
-            'Student': buckets.studentScore,
-            'Teammate': buckets.teammateScore,
-            'Citizen': buckets.citizenScore,
+          'Athlete': buckets.athleteScore,
+          'Student': buckets.studentScore,
+          'Teammate': buckets.teammateScore,
+          'Citizen': buckets.citizenScore,
         },
         // Persist raw transaction sums so the UI can show actual awarded points.
         'rawBucketPoints': {
-            'Athlete': stats[aId]!['ath']!.toInt(),
-            'Student': stats[aId]!['stu']!.toInt(),
-            'Teammate': stats[aId]!['tm']!.toInt(),
-            'Citizen': stats[aId]!['cit']!.toInt(),
+          'Athlete': stats[aId]!['ath']!.toInt(),
+          'Student': stats[aId]!['stu']!.toInt(),
+          'Teammate': stats[aId]!['tm']!.toInt(),
+          'Citizen': stats[aId]!['cit']!.toInt(),
         },
+        // Total subjective rating count for badge gating.
+        'ratingCount': txCount[aId] ?? 0,
       });
     }
 
@@ -171,7 +188,8 @@ class RatingRepository {
     DateTime start, {
     required int seasonLengthDays,
   }) {
-    final daysElapsed = DateTime.now().difference(start).inDays.clamp(0, 999) + 1;
+    final daysElapsed =
+        DateTime.now().difference(start).inDays.clamp(0, 999) + 1;
     return curve.phaseForDay(
       currentDay: daysElapsed,
       seasonLengthDays: seasonLengthDays,
@@ -205,11 +223,14 @@ class RatingRepository {
     }
 
     final combinedByAthlete = <String, double>{};
+    final objectiveByAthlete = <String, double>{};
+    final manualByAthlete = <String, double>{};
     final baselineByAthlete = <String, int>{};
     for (final doc in athletesSnap.docs) {
       final data = doc.data();
 
-      final manual = (data['actualOvr'] is num && (data['actualOvr'] as num) > 0)
+      final manual =
+          (data['actualOvr'] is num && (data['actualOvr'] as num) > 0)
           ? (data['actualOvr'] as num).toInt()
           : toInt(data['ovr']);
 
@@ -237,8 +258,12 @@ class RatingRepository {
         manualOvr: manual,
         baseline: athleteBaseline,
       );
-      combinedByAthlete[doc.id] =
-          curve.combinedScore(assessmentValue: av, manualInputValue: mv);
+      objectiveByAthlete[doc.id] = av;
+      manualByAthlete[doc.id] = mv;
+      combinedByAthlete[doc.id] = curve.combinedScore(
+        assessmentValue: av,
+        manualInputValue: mv,
+      );
 
       // Per-athlete baseline override (v1.0.6) — falls back to team baseline
       // when missing/null on the user doc.
@@ -313,6 +338,8 @@ class RatingRepository {
       startingOvrBaseline: startingOvrBaseline,
       baselineByAthlete: baselineByAthlete,
       bucketScoresByAthlete: bucketScoresByAthlete,
+      objectiveValueByAthlete: objectiveByAthlete,
+      manualInputValueByAthlete: manualByAthlete,
     );
     if (ratings.isEmpty) return;
 
@@ -371,8 +398,9 @@ class RatingRepository {
     final Map<String, Map<String, dynamic>> streakByAthlete = {};
     final Map<String, int> dailyPointsByAthlete = {};
     final anyPositive = sortedAwards.any((e) => e.value > 0);
-    final totalPositive =
-        sortedAwards.where((e) => e.value > 0).fold<int>(0, (s, e) => s + e.value);
+    final totalPositive = sortedAwards
+        .where((e) => e.value > 0)
+        .fold<int>(0, (s, e) => s + e.value);
     if (anyPositive) {
       final snaps = await Future.wait(
         ids.map((id) => firestore.collection('users').doc(id).get()),
@@ -398,8 +426,9 @@ class RatingRepository {
             ? (userData['lastPointDate'] as Timestamp).toDate()
             : null;
         final lastPtStr = lastPt?.toIso8601String().split('T')[0];
-        dailyPointsByAthlete[athleteId] =
-            (lastPtStr == todayStr) ? existingDaily + totalPositive : totalPositive;
+        dailyPointsByAthlete[athleteId] = (lastPtStr == todayStr)
+            ? existingDaily + totalPositive
+            : totalPositive;
       }
     }
 
@@ -427,11 +456,13 @@ class RatingRepository {
       if (anyPositive && streakByAthlete.containsKey(athleteId)) {
         final ref = firestore.collection('users').doc(athleteId);
         final streak = streakByAthlete[athleteId]!;
-        txOps.add((b) => b.update(ref, {
-              'currentStreak': streak,
-              'dailyPoints': dailyPointsByAthlete[athleteId] ?? totalPositive,
-              'lastPointDate': FieldValue.serverTimestamp(),
-            }));
+        txOps.add(
+          (b) => b.update(ref, {
+            'currentStreak': streak,
+            'dailyPoints': dailyPointsByAthlete[athleteId] ?? totalPositive,
+            'lastPointDate': FieldValue.serverTimestamp(),
+          }),
+        );
       }
     }
 
@@ -496,10 +527,10 @@ class RatingRepository {
     await Future.wait(
       ids.map(
         (id) => _badgeRepo.evaluateAfterPoints(
-              athleteId: id,
-              teamId: teamId,
-              schoolId: effectiveSchoolId,
-            ),
+          athleteId: id,
+          teamId: teamId,
+          schoolId: effectiveSchoolId,
+        ),
       ),
     );
   }
@@ -532,8 +563,10 @@ class RatingRepository {
     final next = Map<String, dynamic>.from(currentStreak);
     final now = DateTime.now();
     final todayStr = now.toIso8601String().split('T')[0];
-    final yesterdayStr =
-        now.subtract(const Duration(days: 1)).toIso8601String().split('T')[0];
+    final yesterdayStr = now
+        .subtract(const Duration(days: 1))
+        .toIso8601String()
+        .split('T')[0];
 
     final lastDateStr = next['${category}_lastDate'] as String?;
 
@@ -578,7 +611,7 @@ class RatingRepository {
       note: note,
       createdAt: DateTime.now(),
     );
-    
+
     await awardRating(transaction);
 
     if (isPositive) {
@@ -634,7 +667,10 @@ class RatingRepository {
     String category, {
     int positivePoints = 0,
   }) async {
-    final userDoc = await _provider.firestore.collection('users').doc(athleteId).get();
+    final userDoc = await _provider.firestore
+        .collection('users')
+        .doc(athleteId)
+        .get();
     if (!userDoc.exists || userDoc.data() == null) return;
 
     final userData = userDoc.data()!;

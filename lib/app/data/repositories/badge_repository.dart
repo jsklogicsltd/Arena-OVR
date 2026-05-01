@@ -13,6 +13,14 @@ class BadgeIds {
   static const int ovrTierGoldCardMin = 96;
   static const int ovrTierChampionshipMin = 99;
 
+  // Minimum subjective rating transactions required per tier.
+  // Prevents athletes from unlocking elite badges on Day 1 with a lucky score.
+  static const int txMinCountOnMe = 5; // 80+ badge
+  static const int txMinLockedIn = 8; // 85+ badge
+  static const int txMinAlpha = 10; // 90+ badge
+  static const int txMinGoldCard = 15; // 95+ badge
+  static const int txMinChampionship = 15; // 99  badge
+
   // Subjective tiers
   static const String countOnMe = 'count_on_me';
   static const String lockedIn = 'locked_in';
@@ -33,18 +41,18 @@ class BadgeIds {
   static const String championshipRing = 'championship_ring';
 
   static List<String> get all => [
-        countOnMe,
-        lockedIn,
-        alpha,
-        goldCard,
-        truckStick,
-        streak3,
-        streak7,
-        streak14,
-        streak21,
-        streak30,
-        championshipRing,
-      ];
+    countOnMe,
+    lockedIn,
+    alpha,
+    goldCard,
+    truckStick,
+    streak3,
+    streak7,
+    streak14,
+    streak21,
+    streak30,
+    championshipRing,
+  ];
 
   /// Headline-OVR badges only (order matches [all]).
   static const List<String> ovrHeadlineBadgeIds = [
@@ -55,21 +63,33 @@ class BadgeIds {
     championshipRing,
   ];
 
-  /// IDs unlocked purely by overall OVR ([finalOvr]) at or above each tier floor.
-  static List<String> ovrHeadlineUnlockedIds(int finalOvr) {
+  /// IDs unlocked by overall OVR ([finalOvr]) AND minimum transaction count.
+  ///
+  /// [ratingCount] is the total number of subjective rating transactions
+  /// the athlete has received this season.
+  static List<String> ovrHeadlineUnlockedIds(
+    int finalOvr, {
+    int ratingCount = 0,
+  }) {
     final o = finalOvr.clamp(0, 99);
     final out = <String>[];
-    if (o >= ovrTierCountOnMeMin) out.add(countOnMe);
-    if (o >= ovrTierLockedInMin) out.add(lockedIn);
-    if (o >= ovrTierAlphaMin) out.add(alpha);
-    if (o >= ovrTierGoldCardMin) out.add(goldCard);
-    if (o >= ovrTierChampionshipMin) out.add(championshipRing);
+    if (o >= ovrTierCountOnMeMin && ratingCount >= txMinCountOnMe)
+      out.add(countOnMe);
+    if (o >= ovrTierLockedInMin && ratingCount >= txMinLockedIn)
+      out.add(lockedIn);
+    if (o >= ovrTierAlphaMin && ratingCount >= txMinAlpha) out.add(alpha);
+    if (o >= ovrTierGoldCardMin && ratingCount >= txMinGoldCard)
+      out.add(goldCard);
+    if (o >= ovrTierChampionshipMin && ratingCount >= txMinChampionship)
+      out.add(championshipRing);
     return out;
   }
 
   /// Same Truck Stick + streak math as [BadgeRepository._evaluateBadges] (sections B–C).
   /// [data] must include the same keys as a `users/` doc: `weightLbs`, `assessmentData`, `currentStreak`.
-  static List<String> streakTruckUnlockedIdsFromData(Map<String, dynamic> data) {
+  static List<String> streakTruckUnlockedIdsFromData(
+    Map<String, dynamic> data,
+  ) {
     final earned = <String>[];
 
     final weightLbs = _badgeNumVal(data, 'weightLbs');
@@ -128,7 +148,7 @@ class BadgeIds {
   static List<String> trophyDisplayMerge(UserModel user) {
     final merged = {
       ...user.badges,
-      ...ovrHeadlineUnlockedIds(user.finalOvr),
+      ...ovrHeadlineUnlockedIds(user.finalOvr, ratingCount: user.ratingCount),
       ...streakTruckUnlockedIdsFromData(streakTruckEvalSlice(user)),
     };
     return all.where(merged.contains).toList();
@@ -179,13 +199,13 @@ class BadgeIds {
   static String descriptionFor(String id) {
     switch (id) {
       case countOnMe:
-        return 'Overall OVR reaches $ovrTierCountOnMeMin (80–85 band)';
+        return 'OVR reaches $ovrTierCountOnMeMin+ with at least $txMinCountOnMe ratings';
       case lockedIn:
-        return 'Overall OVR reaches $ovrTierLockedInMin (86–90 band)';
+        return 'OVR reaches $ovrTierLockedInMin+ with at least $txMinLockedIn ratings';
       case alpha:
-        return 'Overall OVR reaches $ovrTierAlphaMin (91–95 band)';
+        return 'OVR reaches $ovrTierAlphaMin+ with at least $txMinAlpha ratings';
       case goldCard:
-        return 'Overall OVR reaches $ovrTierGoldCardMin (before 99)';
+        return 'OVR reaches $ovrTierGoldCardMin+ with at least $txMinGoldCard ratings';
       case truckStick:
         return 'Elite power-to-speed ratio';
       case streak3:
@@ -199,7 +219,7 @@ class BadgeIds {
       case streak30:
         return '30 consecutive point days';
       case championshipRing:
-        return 'Earned by reaching the ultimate 99 OVR.';
+        return 'Earned by reaching 99 OVR with at least $txMinChampionship ratings';
       default:
         return '';
     }
@@ -215,18 +235,20 @@ class BadgeRepository {
     required String teamId,
     required String schoolId,
   }) async {
-    final userDoc =
-        await _provider.firestore.collection('users').doc(athleteId).get();
+    final userDoc = await _provider.firestore
+        .collection('users')
+        .doc(athleteId)
+        .get();
     if (!userDoc.exists || userDoc.data() == null) return [];
 
     final data = userDoc.data()!;
-    final List<String> currentBadges =
-        data['badges'] != null ? List<String>.from(data['badges']) : [];
+    final List<String> currentBadges = data['badges'] != null
+        ? List<String>.from(data['badges'])
+        : [];
 
     final earned = _evaluateBadges(data, athleteId);
 
-    final toAward =
-        earned.where((b) => !currentBadges.contains(b)).toList();
+    final toAward = earned.where((b) => !currentBadges.contains(b)).toList();
     if (toAward.isEmpty) return [];
 
     final athleteName = data['name'] as String? ?? 'Athlete';
@@ -252,9 +274,12 @@ class BadgeRepository {
     merged['uid'] = athleteId;
     final user = UserModel.fromJson(merged);
     final int displayOvr = user.finalOvr;
+    final int ratingCount = user.ratingCount;
 
-    // ── A. OVR headline tiers (aligned with profile / leaderboard `finalOvr`) ────
-    earned.addAll(BadgeIds.ovrHeadlineUnlockedIds(displayOvr));
+    // ── A. OVR headline tiers (now gated by transaction count) ────────────
+    earned.addAll(
+      BadgeIds.ovrHeadlineUnlockedIds(displayOvr, ratingCount: ratingCount),
+    );
 
     earned.addAll(BadgeIds.streakTruckUnlockedIdsFromData(data));
 

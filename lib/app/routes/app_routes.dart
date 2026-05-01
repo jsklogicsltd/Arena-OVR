@@ -12,6 +12,7 @@ abstract class Routes {
   static const NOTIFICATIONS = "/notifications";
   static const BADGES = "/badges";
   static const SETTINGS = "/settings";
+  static const FAQ = "/faq";
   static const CREATE_SCHOOL = "/create-school";
   static const SCHOOL_DETAILS = "/school-details";
   static const ADMIN_SETTINGS = "/admin-settings";

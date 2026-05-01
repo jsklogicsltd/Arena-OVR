@@ -11,7 +11,10 @@ class TeamRepository {
   Future<Map<String, dynamic>?> validateInviteCode(String code) async {
     final query = await _provider.firestore
         .collection('teams')
-        .where('inviteCode', isEqualTo: code.toUpperCase()) // Use inviteCode as the field name might mismatch 'teamCode', fallback to teamCode below just in case.
+        .where(
+          'inviteCode',
+          isEqualTo: code.toUpperCase(),
+        ) // Use inviteCode as the field name might mismatch 'teamCode', fallback to teamCode below just in case.
         .limit(1)
         .get();
 
@@ -38,7 +41,7 @@ class TeamRepository {
     for (int i = 0; i < 6; i++) {
       code += chars[random.nextInt(chars.length)];
     }
-    
+
     final newTeamRef = _provider.firestore.collection('teams').doc();
     final newSeasonRef = _provider.firestore.collection('seasons').doc();
 
@@ -56,7 +59,9 @@ class TeamRepository {
       'teamId': newTeamRef.id,
       'name': 'Season 1',
       'startDate': Timestamp.fromDate(now),
-      'endDate': Timestamp.fromDate(now.add(Duration(days: seasonLengthDays - 1))),
+      'endDate': Timestamp.fromDate(
+        now.add(Duration(days: seasonLengthDays - 1)),
+      ),
       'seasonLengthDays': seasonLengthDays,
       'startingOvrBaseline': startingOvrBaseline,
       'isActive': true,
@@ -67,8 +72,10 @@ class TeamRepository {
     teamJson['coachIds'] = [team.createdBy];
     batch.set(newTeamRef, teamJson);
     batch.set(newSeasonRef, seasonData);
-    
-    final coachRef = _provider.firestore.collection('users').doc(team.createdBy);
+
+    final coachRef = _provider.firestore
+        .collection('users')
+        .doc(team.createdBy);
     batch.update(coachRef, {
       'teamIds': FieldValue.arrayUnion([newTeamRef.id]),
       'activeTeamId': newTeamRef.id,
@@ -118,7 +125,9 @@ class TeamRepository {
     final batch = _provider.firestore.batch();
     batch.update(teamRef, updates);
     if (currentSeasonId != null && currentSeasonId.isNotEmpty) {
-      final seasonRef = _provider.firestore.collection('seasons').doc(currentSeasonId);
+      final seasonRef = _provider.firestore
+          .collection('seasons')
+          .doc(currentSeasonId);
       final seasonSnap = await seasonRef.get();
       final startTs = seasonSnap.data()?['startDate'] as Timestamp?;
       if (startTs != null) {
@@ -169,8 +178,9 @@ class TeamRepository {
 
     // 1. Archive old season + transactions
     if (currentSeasonId != null && currentSeasonId.isNotEmpty) {
-      final oldSeasonRef =
-          _provider.firestore.collection('seasons').doc(currentSeasonId);
+      final oldSeasonRef = _provider.firestore
+          .collection('seasons')
+          .doc(currentSeasonId);
       batch.update(oldSeasonRef, {
         'isActive': false,
         'endDate': FieldValue.serverTimestamp(),
@@ -232,7 +242,10 @@ class TeamRepository {
         .get();
     for (var doc in athletesSnap.docs) {
       batch.update(doc.reference, {
-        ..._athleteSeasonResetUpdates(safeBaseline),
+        ..._athleteSeasonResetUpdates(
+          safeBaseline,
+          existingAthleteData: doc.data(),
+        ),
         'badges': _preserveNonArenaBadges(doc.data()['badges']),
       });
       ops++;
@@ -254,8 +267,15 @@ class TeamRepository {
   /// Single-document payload for an athlete when starting a new season.
   /// Must stay aligned with [CoachController.submitBulkAssessments] / manual entry
   /// (`assessmentData` map: squat, bench_press, 40_yard_dash, gpa, powerNumber, …).
-  static Map<String, dynamic> _athleteSeasonResetUpdates(int baseline) {
+  static Map<String, dynamic> _athleteSeasonResetUpdates(
+    int baseline, {
+    required Map<String, dynamic> existingAthleteData,
+  }) {
     final base = baseline.clamp(0, 90);
+    final rawAssessment = existingAthleteData['assessmentData'];
+    final carriedAssessment = rawAssessment is Map
+        ? Map<String, dynamic>.from(rawAssessment)
+        : <String, dynamic>{};
     return {
       // Manual OVR resets to team baseline.
       'ovr': base,
@@ -265,40 +285,35 @@ class TeamRepository {
       'ovrDay': null,
       'ovrCap': null,
       'currentRating': <String, dynamic>{},
+      'rawBucketPoints': <String, dynamic>{},
+      'ratingCount': 0,
       'currentStreak': <String, dynamic>{},
       'automatedOvr': 0,
-      // Wipe the full assessment blob written by the Award → Assessments tab.
-      'assessmentData': <String, dynamic>{},
-      // Legacy / alternate top-level keys (defensive).
+      // Keep objective assessment metrics across seasons (coach can retest later).
+      'assessmentData': carriedAssessment,
+      // Clear legacy subjective caches only.
       'assessments': FieldValue.delete(),
       'assessment': FieldValue.delete(),
       'assessmentRaw': FieldValue.delete(),
       'assessmentMetrics': FieldValue.delete(),
-      'bodyweight': FieldValue.delete(),
-      'squat': FieldValue.delete(),
-      'bench': FieldValue.delete(),
-      'bench_press': FieldValue.delete(),
-      'power_clean': FieldValue.delete(),
-      'dead_lift': FieldValue.delete(),
-      'dash40': FieldValue.delete(),
-      '40_yard_dash': FieldValue.delete(),
-      '10_yard_fly': FieldValue.delete(),
-      'vertical_jump': FieldValue.delete(),
-      'standing_long_jump': FieldValue.delete(),
-      'gpa': FieldValue.delete(),
     };
   }
 
   Future<void> resetSeason(String teamId) async {
-    final teamDoc = await _provider.firestore.collection('teams').doc(teamId).get();
+    final teamDoc = await _provider.firestore
+        .collection('teams')
+        .doc(teamId)
+        .get();
     if (!teamDoc.exists) return;
 
     final teamData = teamDoc.data()!;
     final currentSeasonId = teamData['currentSeasonId'];
-    final seasonLengthDays =
-        ((teamData['seasonLengthDays'] ?? 15) as num).toInt().clamp(7, 365);
-    final startingOvrBaseline =
-        ((teamData['startingOvrBaseline'] ?? 50) as num).toInt().clamp(0, 90);
+    final seasonLengthDays = ((teamData['seasonLengthDays'] ?? 15) as num)
+        .toInt()
+        .clamp(7, 365);
+    final startingOvrBaseline = ((teamData['startingOvrBaseline'] ?? 50) as num)
+        .toInt()
+        .clamp(0, 90);
     // Firestore WriteBatch limit is 500 ops. This reset can touch many docs, so we
     // commit in chunks to avoid limit failures while still keeping operations tight.
     WriteBatch batch = _provider.firestore.batch();
@@ -310,19 +325,25 @@ class TeamRepository {
         ops = 0;
       }
     }
-    
+
     if (currentSeasonId != null) {
-      final currentSeasonRef = _provider.firestore.collection('seasons').doc(currentSeasonId);
-      batch.update(currentSeasonRef, {'isActive': false, 'endDate': FieldValue.serverTimestamp()});
+      final currentSeasonRef = _provider.firestore
+          .collection('seasons')
+          .doc(currentSeasonId);
+      batch.update(currentSeasonRef, {
+        'isActive': false,
+        'endDate': FieldValue.serverTimestamp(),
+      });
       ops++;
       await flushIfNeeded();
-      
-      final txSnapshot = await _provider.firestore.collection('transactions')
+
+      final txSnapshot = await _provider.firestore
+          .collection('transactions')
           .where('teamId', isEqualTo: teamId)
           .where('seasonId', isEqualTo: currentSeasonId)
           .where('isArchived', isEqualTo: false)
           .get();
-          
+
       for (var doc in txSnapshot.docs) {
         batch.update(doc.reference, {'isArchived': true});
         ops++;
@@ -331,7 +352,10 @@ class TeamRepository {
     }
 
     final newSeasonRef = _provider.firestore.collection('seasons').doc();
-    final seasonSnap = await _provider.firestore.collection('seasons').where('teamId', isEqualTo: teamId).get();
+    final seasonSnap = await _provider.firestore
+        .collection('seasons')
+        .where('teamId', isEqualTo: teamId)
+        .get();
     final newSeasonName = 'Season ${seasonSnap.size + 1}';
 
     final newStart = DateTime.now();
@@ -359,14 +383,18 @@ class TeamRepository {
     ops++;
     await flushIfNeeded();
 
-    final athletesSnap = await _provider.firestore.collection('users')
+    final athletesSnap = await _provider.firestore
+        .collection('users')
         .where('teamId', isEqualTo: teamId)
         .where('role', isEqualTo: 'athlete')
         .get();
-        
+
     for (var doc in athletesSnap.docs) {
       batch.update(doc.reference, {
-        ..._athleteSeasonResetUpdates(startingOvrBaseline),
+        ..._athleteSeasonResetUpdates(
+          startingOvrBaseline,
+          existingAthleteData: doc.data(),
+        ),
         'badges': _preserveNonArenaBadges(doc.data()['badges']),
       });
       ops++;
@@ -386,19 +414,17 @@ class TeamRepository {
         .where('role', isEqualTo: 'athlete')
         .snapshots()
         .map((snap) {
-      final list = snap.docs
-          .map((d) {
+          final list = snap.docs.map((d) {
             final data = d.data();
             data['uid'] = d.id;
             return UserModel.fromJson(data);
-          })
-          .toList();
-      list.sort((a, b) => b.coachVisibleOvr.compareTo(a.coachVisibleOvr));
-      for (int i = 0; i < list.length; i++) {
-        final u = list[i];
-        list[i] = u.copyWith(rank: i + 1, previousRank: u.rank);
-      }
-      return list;
-    });
+          }).toList();
+          list.sort((a, b) => b.coachVisibleOvr.compareTo(a.coachVisibleOvr));
+          for (int i = 0; i < list.length; i++) {
+            final u = list[i];
+            list[i] = u.copyWith(rank: i + 1, previousRank: u.rank);
+          }
+          return list;
+        });
   }
 }

@@ -666,7 +666,9 @@ class _DashboardBodyState extends State<_DashboardBody>
                       ),
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(999),
-                        color: const Color(0xFF0D1526),
+                        color: isElite
+                            ? const Color(0xFF070D18)
+                            : const Color(0xFF0D1526),
                         border: Border.all(
                           color: const Color(0xFFFFD700).withValues(alpha: 0.8),
                           width: 1.5,
@@ -683,7 +685,9 @@ class _DashboardBodyState extends State<_DashboardBody>
                         children: [
                           Icon(
                             Icons.workspace_premium_rounded,
-                            color: kGold.withValues(alpha: 0.95),
+                            color: isElite
+                                ? kGold
+                                : kGold.withValues(alpha: 0.95),
                             size: 17,
                           ),
                           const SizedBox(width: 8),
@@ -692,7 +696,7 @@ class _DashboardBodyState extends State<_DashboardBody>
                                 ? 'TEAM RANKING #${athlete.rank}'
                                 : 'YOUR RATING',
                             style: GoogleFonts.spaceGrotesk(
-                              color: isElite ? eliteReadableText : kGold,
+                              color: isElite ? kGold : kGold,
                               fontSize: 12,
                               fontWeight: FontWeight.w800,
                               letterSpacing: 1.2,

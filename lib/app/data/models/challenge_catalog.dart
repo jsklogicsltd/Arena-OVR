@@ -40,6 +40,7 @@ class ChallengeCatalog {
 
   static const List<String> teammate = [
     'Voluntary Workout',
+    'Missed workout',
     'Team Support',
     'Community Service',
     'Program Representation',
@@ -51,6 +52,7 @@ class ChallengeCatalog {
     'Assignment Completed',
     'Teacher Recognition',
     'Classroom Conduct',
+    'In school suspension',
     'Academic Improvement',
     'GPA 3.5+',
     'GPA 3.0+',

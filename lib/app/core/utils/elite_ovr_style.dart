@@ -3,9 +3,7 @@ import 'package:flutter/material.dart';
 class EliteOvrStyle {
   EliteOvrStyle._();
 
-  static bool isEliteOvr(int ovr) => ovr >= 95;
-
-  static const Color goldTint = Color(0xFFFFD700);
+  static bool isEliteOvr(int ovr) => ovr == 99;
 
   static const LinearGradient eliteCardGradient = LinearGradient(
     begin: Alignment.topLeft,
@@ -32,10 +30,7 @@ class EliteOvrStyle {
     required bool isElite,
     required Widget child,
   }) {
-    if (!isElite) return child;
-    return ColorFiltered(
-      colorFilter: const ColorFilter.mode(goldTint, BlendMode.modulate),
-      child: child,
-    );
+    // Keep profile photos in natural colors for all OVR tiers.
+    return child;
   }
 }
