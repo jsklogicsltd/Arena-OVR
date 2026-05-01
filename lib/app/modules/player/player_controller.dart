@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -13,7 +12,7 @@ import '../../data/models/team_model.dart';
 import '../../data/models/season_model.dart';
 import '../../data/models/transaction_model.dart';
 import '../../data/repositories/rating_repository.dart';
-import '../../core/services/ovr_engine_service.dart' show SeasonOvrUi;
+import '../../data/repositories/badge_repository.dart';
 import '../../scoring_engine/profile_assignment.dart';
 import '../leaderboard/leaderboard_controller.dart';
 import '../feed/feed_controller.dart';
@@ -22,6 +21,7 @@ import '../settings/settings_controller.dart';
 class PlayerController extends GetxController {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final RatingRepository _ratingRepo = RatingRepository();
+  final BadgeRepository _badgeRepo = BadgeRepository();
 
   // ── Observables ───────────────────────────────────────────────────────────────
   final Rx<UserModel?> athlete     = Rx<UserModel?>(null);
@@ -45,107 +45,15 @@ class PlayerController extends GetxController {
 
   // ── Computed ──────────────────────────────────────────────────────────────────
 
-  int get _daysElapsed {
-    final start = season.value?.startDate;
-    final seasonLengthDays =
-        (season.value?.seasonLengthDays ?? team.value?.seasonLengthDays ?? 15)
-            .clamp(7, 365);
-    if (start == null) {
-      final storedDay = athlete.value?.ovrDay;
-      if (storedDay != null) return storedDay.clamp(1, seasonLengthDays);
-      return 1;
-    }
-    return SeasonOvrUi.calculateSeasonDay(
-      seasonStartDate: start,
-      currentDate: DateTime.now(),
-      seasonLengthDays: seasonLengthDays,
-    );
-  }
-
-  bool get isOvrTimingReady {
-    if (athlete.value == null) return false;
-    if (season.value?.startDate != null) return true;
-    if (athlete.value!.ovrDay != null) return true;
-    return false;
-  }
-
-  /// True when day/OVR can be shown without flipping (e.g. not ??? then number).
-  /// Waits for team (if [UserModel.teamId] is set) and season (if team has [currentSeasonId])
-  /// so [_daysElapsed] / visibility does not change when those streams catch up.
-  bool get isOvrDisplayResolved {
-    if (athlete.value == null) return false;
-    final tid = athlete.value!.teamId;
-    if (tid != null && tid.isNotEmpty) {
-      if (team.value == null) return false;
-      final sid = team.value!.currentSeasonId;
-      if (sid != null && sid.isNotEmpty) {
-        if (season.value == null) return false;
-      }
-    }
-    return isOvrTimingReady;
-  }
-
-  int get revealDays {
-    final total =
-        (season.value?.seasonLengthDays ?? team.value?.seasonLengthDays ?? 15)
-            .clamp(7, 365);
-    // Client rule:
-    // - Season <= 14 days: reveal after 1 day (Day 1 locked)
-    // - Season >= 15 days: reveal after 2 days (Days 1-2 locked)
-    return (total <= 14) ? 1 : 2;
-  }
-
   int? get displayedOvr {
     final a = athlete.value;
     if (a == null) return null;
-    final raw = a.finalOvr;
-    if (_daysElapsed <= revealDays) return null; // locked window
-    return math.min(raw, currentPhaseCap);
-  }
-
-  // Reveal window is dynamic based on season length (see [revealDays]).
-  bool get isOvrRevealed => displayedOvr != null;
-  // Full unlock starts when the athlete reaches phase 3.
-  bool get isUnlocked {
-    final total = (season.value?.seasonLengthDays ?? team.value?.seasonLengthDays ?? 15)
-        .clamp(7, 365);
-    final phase2EndDay = ((total * 2.0) / 3.0).ceil();
-    return _daysElapsed > phase2EndDay;
-  }
-
-  int get currentPhaseCap {
-    if (season.value?.startDate == null && athlete.value?.ovrCap != null) {
-      return athlete.value!.ovrCap!.clamp(0, 99);
-    }
-    final total = (season.value?.seasonLengthDays ?? team.value?.seasonLengthDays ?? 15)
-        .clamp(7, 365);
-    final baseline =
-        (season.value?.startingOvrBaseline ?? team.value?.startingOvrBaseline ?? 50)
-            .clamp(0, 90);
-    return SeasonOvrUi.phaseCapForDay(
-      day: _daysElapsed,
-      seasonLengthDays: total,
-      startingOvrBaseline: baseline,
-    );
-  }
-
-  String get capStatusLabel {
-    final d = _daysElapsed;
-    if (d <= revealDays) return 'DAY $d LOCKED';
-    if (isUnlocked) return 'FULLY UNLOCKED';
-    return 'CURRENT CAP: $currentPhaseCap OVR';
+    return a.finalOvr;
   }
 
   String get phaseName {
-    final d = _daysElapsed;
-    final total = (season.value?.seasonLengthDays ?? team.value?.seasonLengthDays ?? 15)
-        .clamp(7, 365);
-    final phase1EndDay = (total / 3.0).ceil();
-    final phase2EndDay = ((total * 2.0) / 3.0).ceil();
-    if (d <= revealDays) return 'DAY $d';
-    if (d <= phase1EndDay) return 'PHASE 1 · DAY $d';
-    if (d <= phase2EndDay) return 'PHASE 2 · DAY $d';
-    return 'UNLOCKED';
+    // Keep a neutral status label for UIs that show season phase text.
+    return 'LIVE OVR';
   }
 
   int get ovrDelta {
@@ -223,6 +131,17 @@ class PlayerController extends GetxController {
           data['uid'] = doc.id;
           athlete.value = UserModel.fromJson(data);
           final teamId = athlete.value!.teamId;
+          if (teamId != null && teamId.isNotEmpty) {
+            unawaited(
+              _badgeRepo.evaluateAfterPoints(
+                athleteId: uid,
+                teamId: teamId,
+                schoolId: athlete.value!.schoolId?.isNotEmpty == true
+                    ? athlete.value!.schoolId!
+                    : 'UNKNOWN_SCHOOL',
+              ),
+            );
+          }
           if (teamId != null) _subscribeToTeam(teamId);
           _loadPointHistory(uid);
           isLoading.value     = false;
@@ -244,8 +163,12 @@ class PlayerController extends GetxController {
         team.value = TeamModel.fromJson(data);
         final sid = team.value!.currentSeasonId;
         if (sid != null) _subscribeToSeason(sid);
-        final createdBy = team.value!.createdBy;
-        if (createdBy.isNotEmpty) _fetchCoachName(createdBy);
+        final coachUid = _resolveCoachUid(data);
+        if (coachUid != null && coachUid.isNotEmpty) {
+          _fetchCoachName(coachUid);
+        } else {
+          coachName.value = null;
+        }
         final schoolId = team.value!.schoolId;
         if (schoolId.isNotEmpty && (team.value!.schoolName == null || team.value!.schoolName!.isEmpty)) {
           _fetchSchoolName(schoolId);
@@ -254,11 +177,34 @@ class PlayerController extends GetxController {
     });
   }
 
+  /// Prefer [createdBy]; fall back to first [coachIds] entry (some team docs only list coachIds).
+  String? _resolveCoachUid(Map<String, dynamic> teamData) {
+    final created = teamData['createdBy'];
+    if (created != null) {
+      final s = created is String ? created : created.toString();
+      if (s.trim().isNotEmpty) return s.trim();
+    }
+    final raw = teamData['coachIds'];
+    if (raw is List && raw.isNotEmpty) {
+      final first = raw.first;
+      if (first != null) {
+        final s = first is String ? first : first.toString();
+        if (s.trim().isNotEmpty) return s.trim();
+      }
+    }
+    return null;
+  }
+
   Future<void> _fetchCoachName(String coachUid) async {
     try {
       final doc = await _firestore.collection('users').doc(coachUid).get();
       if (doc.exists && doc.data() != null) {
-        coachName.value = doc.data()!['name'] as String?;
+        final n = doc.data()!['name'];
+        coachName.value =
+            n == null ? null : (n is String ? n : n.toString()).trim();
+        if (coachName.value?.isEmpty == true) coachName.value = null;
+      } else {
+        coachName.value = null;
       }
     } catch (_) {
       coachName.value = null;

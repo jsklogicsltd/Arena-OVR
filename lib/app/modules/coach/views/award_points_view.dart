@@ -38,7 +38,7 @@ class _AwardPointsViewState extends State<AwardPointsView>
       _spreadsheetRowHPadding * 2 +
       _spreadsheetAthleteColWidth +
       _spreadsheetGap +
-      (_assessmentColWidth * 9);
+      (_assessmentColWidth * 10);
 
   final ScrollController _assessmentHScroll = ScrollController();
 
@@ -328,7 +328,7 @@ class _AwardPointsViewState extends State<AwardPointsView>
                           const SizedBox(width: 12),
                           Expanded(
                             child: Text(
-                              'SELECT CHALLENGE',
+                              'SELECT ACTION',
                               style: GoogleFonts.spaceGrotesk(
                                 color: Colors.white,
                                 fontSize: 14,
@@ -470,7 +470,7 @@ class _AwardPointsViewState extends State<AwardPointsView>
                 children: [
                   Expanded(
                     child: Text(
-                      validValue ?? 'Select challenge',
+                      validValue ?? 'Select Action',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: GoogleFonts.inter(
@@ -509,7 +509,10 @@ class _AwardPointsViewState extends State<AwardPointsView>
         (selectedChallenge[id] != null &&
         selectedChallenge[id]!.isNotEmpty &&
         ChallengeCatalog.challengesFor(id).contains(selectedChallenge[id]));
-    final needsChallenge = active && !challengeOk;
+    // Coach can also satisfy the requirement with a free-text comment — so
+    // don't flash the orange warning border when a note is filled in.
+    final hasNoteText = _noteController.text.trim().isNotEmpty;
+    final needsChallenge = active && !challengeOk && !hasNoteText;
 
     final cardBorder = needsChallenge
         ? const Color(0xFFFFB74D).withValues(alpha: 0.85)
@@ -1218,15 +1221,21 @@ class _AwardPointsViewState extends State<AwardPointsView>
       return;
     }
 
+    // Coach satisfies the requirement with EITHER a valid dropdown selection
+    // OR a non-empty comment. Only block if neither is present for an active
+    // (non-zero) category.
+    final hasNote = _noteController.text.trim().isNotEmpty;
     for (final id in ChallengeCatalog.parentCategories) {
       final v = categoryPoints[id] ?? 0;
       if (v == 0) continue;
       final ch = selectedChallenge[id];
       final options = ChallengeCatalog.challengesFor(id);
-      if (ch == null || ch.isEmpty || !options.contains(ch)) {
+      final dropdownOk =
+          ch != null && ch.isNotEmpty && options.contains(ch);
+      if (!dropdownOk && !hasNote) {
         Get.snackbar(
           'Error',
-          'Select a challenge for ${_categorySectionTitle(id)} (dropdown).',
+          'Select a reason or write a comment for ${_categorySectionTitle(id)}.',
           backgroundColor: AppColors.primary,
           colorText: Colors.white,
         );
@@ -1238,7 +1247,11 @@ class _AwardPointsViewState extends State<AwardPointsView>
     for (final id in ChallengeCatalog.parentCategories) {
       final v = categoryPoints[id] ?? 0;
       if (v == 0) continue;
-      final ch = selectedChallenge[id]!;
+      // If no dropdown was picked, leave subcategory blank — the coach's
+      // note becomes the reason on the transaction / feed / notification
+      // (see RatingRepository.submitPointsBulk which uses `note` as the
+      // feed `content` whenever it is non-empty).
+      final ch = selectedChallenge[id] ?? '';
       awards.add(CategoryAwardInput(category: id, subcategory: ch, value: v));
     }
 
@@ -1457,6 +1470,9 @@ class _AwardPointsViewState extends State<AwardPointsView>
                 child: TextField(
                   controller: _noteController,
                   maxLines: 2,
+                  // Rebuild so category card borders update live as the coach
+                  // types — the note can satisfy the "reason" requirement.
+                  onChanged: (_) => setState(() {}),
                   style: GoogleFonts.inter(color: Colors.white, fontSize: 16),
                   decoration: InputDecoration(
                     hintText:
@@ -1651,6 +1667,7 @@ class _AwardPointsViewState extends State<AwardPointsView>
             ('DL', const Color(0xFFE53935)),
             ('40yd', const Color(0xFF4CAF50)),
             ('10yd', const Color(0xFF4CAF50)),
+            ('5-10-5', const Color(0xFF4CAF50)),
             ('VJ', const Color(0xFF4CAF50)),
             ('BJ', const Color(0xFF4CAF50)),
             ('GPA', const Color(0xFFFFB300)),
@@ -1769,6 +1786,7 @@ class _AwardPointsViewState extends State<AwardPointsView>
                 ('deadLift', existing?['dead_lift']),
                 ('dash40', existing?['40_yard_dash']),
                 ('fly10', existing?['10_yard_fly']),
+                ('shuttle', existing?['shuttle_5_10_5']),
                 ('verticalJump', existing?['vertical_jump']),
                 ('broadJump', existing?['standing_long_jump']),
                 ('gpa', existing?['gpa']),
@@ -1829,6 +1847,7 @@ class _AwardPointsViewState extends State<AwardPointsView>
       final deadLift = double.tryParse(ctrls['deadLift']?.text.trim() ?? '');
       final dash = double.tryParse(ctrls['dash40']?.text.trim() ?? '');
       final fly10 = double.tryParse(ctrls['fly10']?.text.trim() ?? '');
+      final shuttle = double.tryParse(ctrls['shuttle']?.text.trim() ?? '');
       final verticalJump = double.tryParse(
         ctrls['verticalJump']?.text.trim() ?? '',
       );
@@ -1841,6 +1860,7 @@ class _AwardPointsViewState extends State<AwardPointsView>
           deadLift == null &&
           dash == null &&
           fly10 == null &&
+          shuttle == null &&
           verticalJump == null &&
           broadJump == null &&
           gpa == null) {
@@ -1854,6 +1874,7 @@ class _AwardPointsViewState extends State<AwardPointsView>
         'deadLift': deadLift,
         'dash40': dash,
         'fly10': fly10,
+        'shuttle': shuttle,
         'verticalJump': verticalJump,
         'broadJump': broadJump,
         'gpa': gpa,

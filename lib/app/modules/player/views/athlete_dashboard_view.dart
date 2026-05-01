@@ -16,6 +16,7 @@ import '../../../core/widgets/badge_trophy_case.dart';
 import '../../../core/utils/elite_ovr_style.dart';
 import '../../../data/models/feed_model.dart';
 import '../../../data/models/user_model.dart';
+import '../../../data/repositories/badge_repository.dart';
 
 class AthleteDashboardView extends StatelessWidget {
   const AthleteDashboardView({super.key});
@@ -81,7 +82,9 @@ class _DashboardBodyState extends State<_DashboardBody>
 
   void _setupBarAnims(UserModel a) {
     const maxScore = 100.0;
-    final r   = a.currentRating;
+    // Use raw bucket points (actual coach-awarded totals) for bar fill.
+    // Max per category is 100 pts, so fill = rawPts / 100.
+    final r   = a.rawBucketPoints;
     final ath = ((r['Athlete']  ?? r['Competitor'] ?? r['Performance'] ?? 0) as num).toDouble();
     final stu = ((r['Student']  ?? r['Class']       ?? 0) as num).toDouble();
     final tm  = ((r['Teammate'] ?? r['Program']     ?? 0) as num).toDouble();
@@ -112,6 +115,13 @@ class _DashboardBodyState extends State<_DashboardBody>
     final stu     = ((r['Student']  ?? r['Class']       ?? 0) as num).toInt();
     final tm      = ((r['Teammate'] ?? r['Program']     ?? 0) as num).toInt();
     final cit     = ((r['Citizen']  ?? r['Standard']    ?? 0) as num).toInt();
+
+    // Raw bucket points (actual coach-awarded transaction sums)
+    final raw     = athlete.rawBucketPoints;
+    final rawAth  = ((raw['Athlete']  ?? raw['Competitor'] ?? raw['Performance'] ?? 0) as num).toInt();
+    final rawStu  = ((raw['Student']  ?? raw['Class']       ?? 0) as num).toInt();
+    final rawTm   = ((raw['Teammate'] ?? raw['Program']     ?? 0) as num).toInt();
+    final rawCit  = ((raw['Citizen']  ?? raw['Standard']    ?? 0) as num).toInt();
 
     return CustomScrollView(
       physics: const BouncingScrollPhysics(),
@@ -172,6 +182,7 @@ class _DashboardBodyState extends State<_DashboardBody>
                 animation: _barsCtrl,
                 builder: (_, __) => _buildCategoryBars(
                   ath, stu, tm, cit,
+                  rawAth, rawStu, rawTm, rawCit,
                   _athAnim.value, _stuAnim.value, _tmAnim.value, _citAnim.value,
                 ),
               ).animate(delay: 200.ms).fade(duration: 400.ms).slideY(begin: 0.1),
@@ -189,7 +200,7 @@ class _DashboardBodyState extends State<_DashboardBody>
               ).animate(delay: 350.ms).fade(),
               const SizedBox(height: 10),
 
-              _buildAchievements(athlete.badges)
+              _buildAchievements(athlete)
                   .animate(delay: 350.ms)
                   .fade(duration: 400.ms)
                   .slideY(begin: 0.1),
@@ -326,7 +337,7 @@ class _DashboardBodyState extends State<_DashboardBody>
   // ── OVR Hero Card ─────────────────────────────────────────────────────────────
   // Premium FUT-style presentation (visual only; logic unchanged).
 
-  /// Icy glass OVR glyphs: outer glow + cool stroke + gradient fill (used for score and ???).
+  /// Icy glass OVR glyphs: outer glow + cool stroke + gradient fill.
   Widget _crystalOvrText(
     String text, {
     required double fontSize,
@@ -411,18 +422,16 @@ class _DashboardBodyState extends State<_DashboardBody>
 
   Widget _buildOvrHeroCard(UserModel athlete) {
     final isElite = EliteOvrStyle.isEliteOvr(athlete.coachVisibleOvr);
-    final ovrResolved = c.isOvrDisplayResolved;
-    final displayedOvr = c.displayedOvr;
-    final isHidden   = ovrResolved && displayedOvr == null;
-    final isUnlocked = c.isUnlocked;
+    final displayedOvr = athlete.finalOvr;
     final delta      = c.ovrDelta;
-    final showOvrLoader = !ovrResolved;
+    // No reveal/locked state in v1.0.6 — OVR always renders.
 
     const Color kGold = Color(0xFFFFD700);
     const Color kElectricBlue = Color(0xFF38BDF8);
     const Color kLightBlue = Color(0xFF7DD3FC);
     const Color kCrystalLabel = Color(0xFFE2C96E);
-    final cardTextColor = isElite ? const Color(0xFF1E1300) : Colors.white;
+    final cardTextColor = isElite ? const Color(0xFF0B1A2A) : Colors.white;
+    final eliteReadableText = const Color(0xFF0B1A2A);
 
     Widget coinWrap(Widget inner) {
       return AnimatedBuilder(
@@ -472,28 +481,20 @@ class _DashboardBodyState extends State<_DashboardBody>
     }
 
     final Widget ovrCoin = Center(
-      child: showOvrLoader
-          ? coinWrap(
-              Center(child: _buildOvrLoading()),
-            )
-          : isHidden
-              ? coinWrap(
-                  Center(child: _buildHiddenOvr()),
-                )
-              : coinWrap(
-                  TweenAnimationBuilder<double>(
-                    duration: const Duration(milliseconds: 1500),
-                    curve: Curves.easeOut,
-                    tween: Tween(
-                      begin: 0,
-                      end: (displayedOvr ?? 0).toDouble(),
-                    ),
-                    builder: (_, val, __) => _crystalOvrText(
-                      '${val.toInt()}',
-                      fontSize: 88,
-                    ),
-                  ),
-                ),
+      child: coinWrap(
+        TweenAnimationBuilder<double>(
+          duration: const Duration(milliseconds: 1500),
+          curve: Curves.easeOut,
+          tween: Tween(
+            begin: 0,
+            end: displayedOvr.toDouble(),
+          ),
+          builder: (_, val, __) => _crystalOvrText(
+            '${val.toInt()}',
+            fontSize: 88,
+          ),
+        ),
+      ),
     );
 
     return Container(
@@ -665,7 +666,9 @@ class _DashboardBodyState extends State<_DashboardBody>
                       ),
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(999),
-                        color: const Color(0xFF0D1526),
+                        color: isElite
+                            ? const Color(0xFF070D18)
+                            : const Color(0xFF0D1526),
                         border: Border.all(
                           color: const Color(0xFFFFD700).withValues(alpha: 0.8),
                           width: 1.5,
@@ -682,7 +685,9 @@ class _DashboardBodyState extends State<_DashboardBody>
                         children: [
                           Icon(
                             Icons.workspace_premium_rounded,
-                            color: kGold.withValues(alpha: 0.95),
+                            color: isElite
+                                ? kGold
+                                : kGold.withValues(alpha: 0.95),
                             size: 17,
                           ),
                           const SizedBox(width: 8),
@@ -691,7 +696,7 @@ class _DashboardBodyState extends State<_DashboardBody>
                                 ? 'TEAM RANKING #${athlete.rank}'
                                 : 'YOUR RATING',
                             style: GoogleFonts.spaceGrotesk(
-                              color: isElite ? const Color(0xFF2E1E00) : kGold,
+                              color: isElite ? kGold : kGold,
                               fontSize: 12,
                               fontWeight: FontWeight.w800,
                               letterSpacing: 1.2,
@@ -722,7 +727,7 @@ class _DashboardBodyState extends State<_DashboardBody>
                     'OVERALL RATING',
                     textAlign: TextAlign.center,
                     style: GoogleFonts.spaceGrotesk(
-                      color: isElite ? const Color(0xFF2E1E00) : kCrystalLabel,
+                      color: isElite ? eliteReadableText : kCrystalLabel,
                       fontSize: 11,
                       fontWeight: FontWeight.w700,
                       letterSpacing: 5.0,
@@ -736,8 +741,7 @@ class _DashboardBodyState extends State<_DashboardBody>
                         color: Colors.white.withValues(alpha: 0.5),
                       ),
                   const SizedBox(height: 14),
-                  if (ovrResolved && !isHidden)
-                    Container(
+                  Container(
                       width: double.infinity,
                       height: 42,
                       decoration: BoxDecoration(
@@ -807,7 +811,7 @@ class _DashboardBodyState extends State<_DashboardBody>
                           curve: Curves.easeOut,
                         )
                         .fade(duration: 400.ms),
-                  if (ovrResolved && !isHidden) const SizedBox(height: 14),
+                  const SizedBox(height: 14),
                   Row(
                     children: [
                       if (athlete.rank != null) ...[
@@ -872,29 +876,8 @@ class _DashboardBodyState extends State<_DashboardBody>
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Row(
-                        children: [
-                          Icon(
-                            isUnlocked
-                                ? Icons.lock_open_rounded
-                                : Icons.verified_rounded,
-                            color: AppColors.tierGold,
-                            size: 14,
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            ovrResolved ? c.capStatusLabel : 'SYNCING OVR...',
-                            style: GoogleFonts.spaceGrotesk(
-                              color: AppColors.textSecondary,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                              letterSpacing: 0.5,
-                            ),
-                          ),
-                        ],
-                      ),
                       Text(
-                        ovrResolved ? c.phaseName : 'LOADING',
+                        c.phaseName,
                         style: GoogleFonts.spaceGrotesk(
                           color: cardTextColor,
                           fontSize: 13,
@@ -918,37 +901,6 @@ class _DashboardBodyState extends State<_DashboardBody>
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildHiddenOvr() {
-    return AnimatedBuilder(
-      animation: _streakCtrl,
-      builder: (_, __) => Opacity(
-        opacity: 0.35 + _streakCtrl.value * 0.65,
-        child: Column(
-          children: [
-            Icon(
-              Icons.lock_outline_rounded,
-              color: AppColors.textSecondary,
-              size: 34,
-            ),
-            const SizedBox(height: 6),
-            _crystalOvrText('???', fontSize: 108, height: 0.9),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildOvrLoading() {
-    return const SizedBox(
-      width: 40,
-      height: 40,
-      child: CircularProgressIndicator(
-        strokeWidth: 2.6,
-        color: AppColors.tierGold,
       ),
     );
   }
@@ -1369,6 +1321,7 @@ class _DashboardBodyState extends State<_DashboardBody>
 
   Widget _buildCategoryBars(
     int ath, int stu, int tm, int cit,
+    int rawAth, int rawStu, int rawTm, int rawCit,
     double athPct, double stuPct, double tmPct, double citPct,
   ) {
     return ClipRRect(
@@ -1389,13 +1342,13 @@ class _DashboardBodyState extends State<_DashboardBody>
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              _buildBar('COMPETITOR',   ath, athPct, AppColors.primary),
+              _buildBar('COMPETITOR',   rawAth, athPct, AppColors.primary),
               const SizedBox(height: 20),
-              _buildBar('STUDENT',   stu, stuPct, AppColors.positive),
+              _buildBar('STUDENT',   rawStu, stuPct, AppColors.positive),
               const SizedBox(height: 20),
-              _buildBar('TEAMMATE',  tm,  tmPct,  const Color(0xFF9B30FF)),
+              _buildBar('TEAMMATE',  rawTm,  tmPct,  const Color(0xFF9B30FF)),
               const SizedBox(height: 20),
-              _buildBar('CITIZEN',   cit, citPct, const Color(0xFFFF9500)),
+              _buildBar('CITIZEN',   rawCit, citPct, const Color(0xFFFF9500)),
             ],
           ),
         ),
@@ -1456,8 +1409,11 @@ class _DashboardBodyState extends State<_DashboardBody>
   // Card: radius=24, padding=20, fill=#FFFFFF@3%, border=1px #FFFFFF@10%, blur=12
   // Unlocked: solid color circle, white icon. Locked: grey circle, subtle border, padlock.
 
-  Widget _buildAchievements(List<String> badges) {
-    return BadgeTrophyCase(earnedBadges: badges, badgeSize: 56);
+  Widget _buildAchievements(UserModel athlete) {
+    return BadgeTrophyCase(
+      earnedBadges: BadgeIds.trophyDisplayMerge(athlete),
+      badgeSize: 56,
+    );
   }
 
   // ── Recent Ratings ────────────────────────────────────────────────────────────

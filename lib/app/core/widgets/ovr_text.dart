@@ -38,7 +38,7 @@ class _OvrTextState extends State<OvrText> with SingleTickerProviderStateMixin {
       return FadeTransition(
         opacity: _animation,
         child: Text(
-          '???',
+          '—',
           style: GoogleFonts.bebasNeue(
             fontSize: widget.fontSize,
             color: AppColors.textSecondary,

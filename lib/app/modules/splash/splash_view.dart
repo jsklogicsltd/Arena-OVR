@@ -182,7 +182,7 @@ class _SplashViewState extends State<SplashView>
 
                 // ── Footer ─────────────────────────────────────
                 Text(
-                  'BUILT FOR CHAMPIONS',
+                  'Chasing99',
                   style: GoogleFonts.spaceGrotesk(
                     fontSize: 10,
                     fontWeight: FontWeight.w500,

@@ -26,15 +26,21 @@ class ChallengeCatalog {
   ];
 
   static const List<String> citizen = [
-    'Elite Effort',
-    'Positive Attitude',
-    'Coachability',
-    'Team-First Behavior',
-    'Bounced Back From Mistake',
+    'High Trust',
+    'Supports other school events',
+    'Recognized publicly for character',
+    'Helps a classmate or someone in need',
+    'Represents program with class at all times',
+    'Does the right thing when no one is watching',
+    'Honest in situations (owns mistakes)',
+    'Trusted by coaches and staff',
+    'Promotes teammates/team online',
+    'Participates in community service',
   ];
 
   static const List<String> teammate = [
     'Voluntary Workout',
+    'Missed workout',
     'Team Support',
     'Community Service',
     'Program Representation',
@@ -46,6 +52,7 @@ class ChallengeCatalog {
     'Assignment Completed',
     'Teacher Recognition',
     'Classroom Conduct',
+    'In school suspension',
     'Academic Improvement',
     'GPA 3.5+',
     'GPA 3.0+',

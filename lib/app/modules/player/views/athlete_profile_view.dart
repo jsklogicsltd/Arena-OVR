@@ -16,6 +16,7 @@ import '../../../core/utils/elite_ovr_style.dart';
 import '../../../data/models/user_model.dart';
 import '../../../data/models/transaction_model.dart';
 import '../../../data/repositories/rating_repository.dart';
+import '../../../data/repositories/badge_repository.dart';
 
 /// Can be used in two modes:
 /// 1. Own profile from bottom-nav tab → isOwnProfile = true (default)
@@ -80,7 +81,9 @@ class _AthleteProfileViewState extends State<AthleteProfileView>
 
   void _setupBarAnims(UserModel a) {
     const maxScore = 100.0;
-    final r   = a.currentRating;
+    // Use raw bucket points (actual coach-awarded totals) for bar fill.
+    // Max per category is 100 pts, so fill = rawPts / 100.
+    final r   = a.rawBucketPoints;
     final ath = ((r['Athlete']  ?? r['Competitor'] ?? r['Performance'] ?? 0) as num).toDouble();
     final stu = ((r['Student']  ?? r['Class']       ?? 0) as num).toDouble();
     final tm  = ((r['Teammate'] ?? r['Program']     ?? 0) as num).toDouble();
@@ -184,6 +187,13 @@ class _AthleteProfileViewState extends State<AthleteProfileView>
     final tm      = ((r['Teammate'] ?? r['Program']     ?? 0) as num).toInt();
     final cit     = ((r['Citizen']  ?? r['Standard']    ?? 0) as num).toInt();
 
+    // Raw bucket points (actual coach-awarded transaction sums)
+    final raw     = athlete.rawBucketPoints;
+    final rawAth  = ((raw['Athlete']  ?? raw['Competitor'] ?? raw['Performance'] ?? 0) as num).toInt();
+    final rawStu  = ((raw['Student']  ?? raw['Class']       ?? 0) as num).toInt();
+    final rawTm   = ((raw['Teammate'] ?? raw['Program']     ?? 0) as num).toInt();
+    final rawCit  = ((raw['Citizen']  ?? raw['Standard']    ?? 0) as num).toInt();
+
     return CustomScrollView(
       physics: const BouncingScrollPhysics(),
       slivers: [
@@ -233,6 +243,7 @@ class _AthleteProfileViewState extends State<AthleteProfileView>
                 animation: _barsCtrl,
                 builder: (_, __) => _buildCategoryBars(
                   ath, stu, tm, cit,
+                  rawAth, rawStu, rawTm, rawCit,
                   _athAnim.value, _stuAnim.value, _tmAnim.value, _citAnim.value,
                 ),
               ).animate(delay: 250.ms).fade(duration: 400.ms).slideY(begin: 0.1),
@@ -250,7 +261,7 @@ class _AthleteProfileViewState extends State<AthleteProfileView>
               ).animate(delay: 380.ms).fade(),
               const SizedBox(height: 14),
 
-              _buildAchievements(athlete.badges)
+              _buildAchievements(athlete)
                   .animate(delay: 380.ms).fade(duration: 400.ms).slideY(begin: 0.1),
               const SizedBox(height: 28),
 
@@ -481,16 +492,9 @@ class _AthleteProfileViewState extends State<AthleteProfileView>
   }
 
   Widget _buildPlayerInfo(UserModel athlete, PlayerController? c) {
-    final shownOvr = widget.isOwnProfile
-        ? (c?.displayedOvr ?? 0)
-        : athlete.coachVisibleOvr;
-    // Match athlete dashboard: ??? only after season/team streams resolved (not while loading).
-    final isOvrHidden = widget.isOwnProfile &&
-        c != null &&
-        c.isOvrDisplayResolved &&
-        c.displayedOvr == null;
-    final showOvrLoading =
-        widget.isOwnProfile && c != null && !c.isOvrDisplayResolved;
+    // Keep profile OVR source aligned with leaderboard:
+    // both must render the same final curved OVR field.
+    final shownOvr = athlete.coachVisibleOvr;
     String teamName;
     if (widget.isOwnProfile && c != null) {
       teamName = c.team.value?.name ?? '—';
@@ -577,51 +581,27 @@ class _AthleteProfileViewState extends State<AthleteProfileView>
           ],
         ),
         const SizedBox(height: 14),
-        // OVR Number + label
-        if (showOvrLoading)
-          Column(
+        // OVR Number + label (never day-locked / hidden)
+        TweenAnimationBuilder<double>(
+          duration: const Duration(milliseconds: 1400),
+          curve: Curves.easeOut,
+          tween: Tween(begin: 0, end: shownOvr.toDouble()),
+          builder: (_, val, __) => Column(
             crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              SizedBox(
-                height: 52,
-                width: 52,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2.5,
-                  color: AppColors.tierGold.withValues(alpha: 0.9),
-                ),
-              ),
-              const SizedBox(height: 10),
-              Text(
-                'SYNCING OVR…',
-                style: GoogleFonts.spaceGrotesk(
-                  color: AppColors.textSecondary,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.8,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'FINAL OVR (50/50 CURVE)',
-                style: GoogleFonts.spaceGrotesk(
-                  color: AppColors.seasonGold,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 1.2,
-                ),
-              ),
-            ],
-          )
-        else if (isOvrHidden)
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                '???',
+                '${val.toInt()}',
                 style: GoogleFonts.bebasNeue(
                   fontSize: 64,
-                  color: AppColors.textSecondary,
+                  color: tierColor,
                   height: 0.9,
+                  shadows: [
+                    Shadow(
+                      color: tierColor.withOpacity(0.5),
+                      blurRadius: 20,
+                    ),
+                  ],
                 ),
               ),
               const SizedBox(height: 4),
@@ -635,43 +615,8 @@ class _AthleteProfileViewState extends State<AthleteProfileView>
                 ),
               ),
             ],
-          )
-        else
-          TweenAnimationBuilder<double>(
-            duration: const Duration(milliseconds: 1400),
-            curve: Curves.easeOut,
-            tween: Tween(begin: 0, end: shownOvr.toDouble()),
-            builder: (_, val, __) => Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  '${val.toInt()}',
-                  style: GoogleFonts.bebasNeue(
-                    fontSize: 64,
-                    color: tierColor,
-                    height: 0.9,
-                    shadows: [
-                      Shadow(
-                        color: tierColor.withOpacity(0.5),
-                        blurRadius: 20,
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'FINAL OVR (50/50 CURVE)',
-                  style: GoogleFonts.spaceGrotesk(
-                    color: AppColors.seasonGold,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 1.2,
-                  ),
-                ),
-              ],
-            ),
           ),
+        ),
       ],
     );
   }
@@ -682,18 +627,19 @@ class _AthleteProfileViewState extends State<AthleteProfileView>
 
   Widget _buildCategoryBars(
     int ath, int stu, int tm, int cit,
+    int rawAth, int rawStu, int rawTm, int rawCit,
     double athPct, double stuPct, double tmPct, double citPct,
   ) {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        _buildStatCard('COMPETITOR',   ath, athPct, AppColors.primary),
+        _buildStatCard('COMPETITOR',   rawAth, athPct, AppColors.primary),
         const SizedBox(height: 8),
-        _buildStatCard('STUDENT',   stu, stuPct, AppColors.positive),
+        _buildStatCard('STUDENT',   rawStu, stuPct, AppColors.positive),
         const SizedBox(height: 8),
-        _buildStatCard('TEAMMATE',  tm,  tmPct,  const Color(0xFF9B30FF)),
+        _buildStatCard('TEAMMATE',  rawTm,  tmPct,  const Color(0xFF9B30FF)),
         const SizedBox(height: 8),
-        _buildStatCard('CITIZEN',   cit, citPct, const Color(0xFFFF9500)),
+        _buildStatCard('CITIZEN',   rawCit, citPct, const Color(0xFFFF9500)),
       ],
     );
   }
@@ -768,8 +714,11 @@ class _AthleteProfileViewState extends State<AthleteProfileView>
 
   // ── Achievements ──────────────────────────────────────────────────────────────
 
-  Widget _buildAchievements(List<String> badges) {
-    return BadgeTrophyCase(earnedBadges: badges, badgeSize: 54);
+  Widget _buildAchievements(UserModel athlete) {
+    return BadgeTrophyCase(
+      earnedBadges: BadgeIds.trophyDisplayMerge(athlete),
+      badgeSize: 54,
+    );
   }
 
   // ── History ───────────────────────────────────────────────────────────────────

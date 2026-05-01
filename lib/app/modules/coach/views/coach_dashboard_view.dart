@@ -13,6 +13,8 @@ import '../../../core/widgets/glass_card.dart';
 import '../../../core/widgets/periodic_shimmer_bar.dart';
 import '../../../core/components/animated_glowing_border.dart';
 import '../../../routes/app_routes.dart';
+import '../../../data/models/feed_model.dart';
+import '../../../data/repositories/badge_repository.dart';
 import 'announcement_view.dart';
 
 class CoachDashboardView extends GetView<CoachController> {
@@ -146,6 +148,10 @@ class _DashboardBodyState extends State<_DashboardBody> with TickerProviderState
   late Animation<double> _tmAnim;
   late Animation<double> _impAnim;
   late Animation<double> _stdAnim;
+  late Animation<double> _rawPerAnim;
+  late Animation<double> _rawTmAnim;
+  late Animation<double> _rawImpAnim;
+  late Animation<double> _rawStdAnim;
 
   CoachController get c => widget.controller;
 
@@ -208,6 +214,24 @@ class _DashboardBodyState extends State<_DashboardBody> with TickerProviderState
     return sum / roster.length;
   }
 
+  /// Average of *raw* (unclamped) transaction sums per bucket across the roster.
+  static double _avgRawBucketPoints(List<UserModel> roster, String key, [String? altKey]) {
+    if (roster.isEmpty) return 0;
+    double sum = 0;
+    for (final a in roster) {
+      final m = a.rawBucketPoints;
+      final raw = m[key] ??
+          (key == 'Athlete' ? m['Competitor'] : null) ??
+          (altKey != null ? m[altKey] : null);
+      if (raw is num) {
+        sum += raw.toDouble();
+      } else if (raw != null) {
+        sum += double.tryParse(raw.toString()) ?? 0;
+      }
+    }
+    return sum / roster.length;
+  }
+
   void _refresh() {
     final rosterAll = c.roster;
     // For coach dashboard we want TEAM metrics to always reflect the full roster,
@@ -220,12 +244,21 @@ class _DashboardBodyState extends State<_DashboardBody> with TickerProviderState
     final double classVal;
     final double progVal;
     final double stdVal;
+    // Raw averages for text labels
+    final double rawPerVal;
+    final double rawClassVal;
+    final double rawProgVal;
+    final double rawStdVal;
     if (isReal) {
       ovrVal = roster.map((a) => a.coachVisibleOvr).reduce((a, b) => a + b) / roster.length;
       perVal = _avgCategoryPoints(roster, 'Athlete', 'Performance');
       classVal = _avgCategoryPoints(roster, 'Student', 'Class');
       progVal = _avgCategoryPoints(roster, 'Teammate', 'Program');
       stdVal = _avgCategoryPoints(roster, 'Citizen', 'Standard');
+      rawPerVal = _avgRawBucketPoints(roster, 'Athlete', 'Performance');
+      rawClassVal = _avgRawBucketPoints(roster, 'Student', 'Class');
+      rawProgVal = _avgRawBucketPoints(roster, 'Teammate', 'Program');
+      rawStdVal = _avgRawBucketPoints(roster, 'Citizen', 'Standard');
     } else {
       // When season just reset and nobody has points yet, keep values at 0
       // instead of using potentially-stale stored team averages.
@@ -234,6 +267,10 @@ class _DashboardBodyState extends State<_DashboardBody> with TickerProviderState
       classVal = 0;
       progVal = 0;
       stdVal = 0;
+      rawPerVal = 0;
+      rawClassVal = 0;
+      rawProgVal = 0;
+      rawStdVal = 0;
     }
     final activePl = (isReal ? roster.length : 0).toDouble();
     final double avgOvr = isReal ? ovrVal : 0;
@@ -253,6 +290,10 @@ class _DashboardBodyState extends State<_DashboardBody> with TickerProviderState
     _tmAnim       = Tween<double>(begin: 0, end: classVal).animate(curve);
     _impAnim      = Tween<double>(begin: 0, end: progVal).animate(curve);
     _stdAnim      = Tween<double>(begin: 0, end: stdVal).animate(curve);
+    _rawPerAnim   = Tween<double>(begin: 0, end: rawPerVal).animate(curve);
+    _rawTmAnim    = Tween<double>(begin: 0, end: rawClassVal).animate(curve);
+    _rawImpAnim   = Tween<double>(begin: 0, end: rawProgVal).animate(curve);
+    _rawStdAnim   = Tween<double>(begin: 0, end: rawStdVal).animate(curve);
     _ratingsAnim  = Tween<double>(begin: 0, end: ratings).animate(curve);
     _playersAnim  = Tween<double>(begin: 0, end: activePl).animate(curve);
     _avgOvrAnim   = Tween<double>(begin: 0, end: avgOvr).animate(curve);
@@ -266,8 +307,10 @@ class _DashboardBodyState extends State<_DashboardBody> with TickerProviderState
   }
 
   // Delegate helper methods from original GetView
-  Widget _buildStatBar(String label, double animValue, Color color, double max) {
+  Widget _buildStatBar(String label, double animValue, Color color, double max, {int? rawLabel}) {
     final pct = max > 0 ? (animValue / max).clamp(0.0, 1.0) : 0.0;
+    // Display raw awarded points if available, otherwise fall back to scaled value.
+    final displayValue = rawLabel ?? animValue.toInt();
     return Expanded(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -284,7 +327,7 @@ class _DashboardBodyState extends State<_DashboardBody> with TickerProviderState
                 ),
               ),
               const SizedBox(width: 4),
-              Text(animValue.toInt().toString(), style: GoogleFonts.spaceGrotesk(color: color, fontSize: 13, fontWeight: FontWeight.bold)),
+              Text(displayValue.toString(), style: GoogleFonts.spaceGrotesk(color: color, fontSize: 13, fontWeight: FontWeight.bold)),
             ],
           ),
           const SizedBox(height: 6),
@@ -631,13 +674,13 @@ class _DashboardBodyState extends State<_DashboardBody> with TickerProviderState
                                       Row(
                                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                         children: [
-                                          _buildStatBar('COMP', _perAnim.value, AppColors.primary, 100),
+                                          _buildStatBar('COMP', _perAnim.value, AppColors.primary, 100, rawLabel: _rawPerAnim.value.toInt()),
                                           const SizedBox(width: 12),
-                                          _buildStatBar('STU', _tmAnim.value, AppColors.positive, 100),
+                                          _buildStatBar('STU', _tmAnim.value, AppColors.positive, 100, rawLabel: _rawTmAnim.value.toInt()),
                                           const SizedBox(width: 12),
-                                          _buildStatBar('TM', _impAnim.value, AppColors.seasonGold, 100),
+                                          _buildStatBar('TM', _impAnim.value, AppColors.seasonGold, 100, rawLabel: _rawImpAnim.value.toInt()),
                                           const SizedBox(width: 12),
-                                          _buildStatBar('CIT', _stdAnim.value, Colors.grey, 100),
+                                          _buildStatBar('CIT', _stdAnim.value, Colors.grey, 100, rawLabel: _rawStdAnim.value.toInt()),
                                         ],
                                       ),
                                       ],
@@ -766,14 +809,26 @@ class _DashboardBodyState extends State<_DashboardBody> with TickerProviderState
                       // Recent Feed (Real or Mock Data if empty)
                       Builder(builder: (context) {
                         final items = c.feed.isNotEmpty
-                            ? c.feed.take(3).map((f) => _MockActivity(
+                            ? c.feed.take(3).map((f) {
+                                  final badgeActor = f.type.toUpperCase() == 'BADGE'
+                                      ? _badgeFeedActorLabel(f)
+                                      : f.actorName;
+                                  return _MockActivity(
                                   type: f.type,
                                   title: f.type.toUpperCase() == 'RATING'
                                       ? '${f.actorName} gave ${f.targetDisplayLabel} ${f.ratingPointsDescription}'
                                       : f.content,
                                   timeAgo: _timeAgo(f.createdAt),
-                                  actorName: f.actorName,
-                                )).toList()
+                                  actorName: badgeActor,
+                                  badgeAssetId: f.type.toUpperCase() == 'BADGE'
+                                      ? (f.badgeId?.trim().isNotEmpty == true
+                                          ? f.badgeId
+                                          : BadgeIds.assetIdFromEarnedContent(
+                                              f.content,
+                                            ))
+                                      : null,
+                                );
+                                }).toList()
                             : <_MockActivity>[];
 
                         if (items.isEmpty) {
@@ -804,7 +859,7 @@ class _DashboardBodyState extends State<_DashboardBody> with TickerProviderState
                             final isPerformance = item.type == 'PERFORMANCE' || item.type == 'POINTS'; // Adjust type as needed
                             final icon = isPerformance ? Icons.star_border : Icons.military_tech;
                             final iconColor = isPerformance ? const Color(0xFF00A1FF) : const Color(0xFFFFD700);
-
+                            final badgeId = item.badgeAssetId?.trim();
 
                             final titleWidget = Text(
                               '${item.actorName} - ${item.title}',
@@ -833,16 +888,43 @@ class _DashboardBodyState extends State<_DashboardBody> with TickerProviderState
                                     ),
                                     child: Row(
                                       children: [
-                                        // Icon Container
-                                        Container(
-                                          width: 48,
-                                          height: 48,
-                                          decoration: BoxDecoration(
-                                            color: iconColor.withOpacity(0.1),
-                                            shape: BoxShape.circle,
+                                        // Badge art (Recognition wall parity) or rating / default icon
+                                        if (badgeId != null && badgeId.isNotEmpty)
+                                          SizedBox(
+                                            width: 48,
+                                            height: 48,
+                                            child: ClipOval(
+                                              child: Stack(
+                                                fit: StackFit.expand,
+                                                children: [
+                                                  const ColoredBox(color: Color(0xFF1A3049)),
+                                                  Image.asset(
+                                                    'assets/badges/$badgeId.png',
+                                                    fit: BoxFit.cover,
+                                                    alignment: Alignment.center,
+                                                    filterQuality: FilterQuality.high,
+                                                    errorBuilder: (_, __, ___) => Container(
+                                                      decoration: BoxDecoration(
+                                                        color: iconColor.withOpacity(0.1),
+                                                        shape: BoxShape.circle,
+                                                      ),
+                                                      child: Icon(icon, color: iconColor, size: 24),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          )
+                                        else
+                                          Container(
+                                            width: 48,
+                                            height: 48,
+                                            decoration: BoxDecoration(
+                                              color: iconColor.withOpacity(0.1),
+                                              shape: BoxShape.circle,
+                                            ),
+                                            child: Icon(icon, color: iconColor, size: 24),
                                           ),
-                                          child: Icon(icon, color: iconColor, size: 24),
-                                        ),
                                         const SizedBox(width: 12), // Gap 12px
                                         // Text Content
                                         Expanded(
@@ -971,6 +1053,15 @@ class _DashboardBodyState extends State<_DashboardBody> with TickerProviderState
     return '${(diff.inDays / 7).floor()} wk ago';
   }
 
+  /// Badge feed rows used `actorName: System`; older docs still do — prefer athlete [targetName].
+  static String _badgeFeedActorLabel(FeedModel f) {
+    final a = f.actorName.trim();
+    if (a.isNotEmpty && a != 'System') return a;
+    final t = f.targetName.trim();
+    if (t.isNotEmpty) return t;
+    return 'Athlete';
+  }
+
   Widget _buildStatTile({
     required String value,
     required String label,
@@ -1056,11 +1147,14 @@ class _MockActivity {
   final String title;
   final String timeAgo;
   final String actorName;
+  /// Same ids as `assets/badges/*.png` when [type] is BADGE.
+  final String? badgeAssetId;
 
   _MockActivity({
     required this.type,
     required this.title,
     required this.timeAgo,
     required this.actorName,
+    this.badgeAssetId,
   });
 }

@@ -7,9 +7,9 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:533126310016:android:76e4e538c79e3527865e65",
+        "mobilesdk_app_id": "1:533126310016:android:33572af238940d21865e65",
         "android_client_info": {
-          "package_name": "com.arenaover.app"
+          "package_name": "com.arenaovr.app"
         }
       },
       "oauth_client": [],
@@ -29,25 +29,6 @@
         "mobilesdk_app_id": "1:533126310016:android:0da254a34f044326865e65",
         "android_client_info": {
           "package_name": "com.arenaovr.scoreapp"
-        }
-      },
-      "oauth_client": [],
-      "api_key": [
-        {
-          "current_key": "AIzaSyDvBRImg4obfJV2qUksw9v64HcWAGzFLG0"
-        }
-      ],
-      "services": {
-        "appinvite_service": {
-          "other_platform_oauth_client": []
-        }
-      }
-    },
-    {
-      "client_info": {
-        "mobilesdk_app_id": "1:533126310016:android:56dd4dac53ff2b96865e65",
-        "android_client_info": {
-          "package_name": "com.example.arena_ovr"
         }
       },
       "oauth_client": [],

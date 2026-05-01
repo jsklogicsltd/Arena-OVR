@@ -442,14 +442,23 @@ class _RosterViewState extends State<RosterView> {
                                       style: GoogleFonts.spaceGrotesk(color: isElite ? const Color(0xFF2E1E00) : tierColor, fontSize: 24, fontWeight: FontWeight.w900, height: 1.0),
                                     ),
                                     const SizedBox(width: 8),
-                                    const Icon(Icons.chevron_right, color: Colors.white24, size: 20),
+                                    Icon(
+                                      Icons.chevron_right,
+                                      color: isElite ? const Color(0xCC0B1A2A) : Colors.white24,
+                                      size: 20,
+                                    ),
                                   ],
                                 ),
                                 Padding(
                                   padding: const EdgeInsets.only(right: 28.0, top: 2),
                                   child: Text(
                                     'OVR',
-                                    style: GoogleFonts.spaceGrotesk(color: Colors.white54, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 1.0),
+                                    style: GoogleFonts.spaceGrotesk(
+                                      color: isElite ? const Color(0xE60B1A2A) : Colors.white54,
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.bold,
+                                      letterSpacing: 1.0,
+                                    ),
                                   ),
                                 ),
                               ],

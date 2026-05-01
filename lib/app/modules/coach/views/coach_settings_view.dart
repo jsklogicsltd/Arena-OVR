@@ -403,6 +403,12 @@ class _CoachSettingsViewState extends State<CoachSettingsView> {
                         _buildSettingsGroup(
                           children: [
                             _buildSettingsItem(
+                              title: 'FAQ',
+                              showArrow: true,
+                              onTap: () => Get.toNamed(Routes.FAQ),
+                            ),
+                            _buildDivider(),
+                            _buildSettingsItem(
                               title: 'Change Password',
                               showArrow: true,
                               onTap: () => ChangePasswordHelper.show(context),

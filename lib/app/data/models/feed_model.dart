@@ -18,6 +18,8 @@ class FeedModel {
   final DateTime? createdAt;
   final String? actorProfileUrl;
   final String? actorRole;
+  /// For [type] == BADGE: asset id under `assets/badges/` (e.g. `count_on_me`).
+  final String? badgeId;
 
   FeedModel({
     required this.id,
@@ -36,6 +38,7 @@ class FeedModel {
     this.createdAt,
     this.actorProfileUrl,
     this.actorRole,
+    this.badgeId,
   });
 
   FeedModel copyWith({
@@ -55,6 +58,7 @@ class FeedModel {
     DateTime? createdAt,
     String? actorProfileUrl,
     String? actorRole,
+    String? badgeId,
   }) {
     return FeedModel(
       id: id ?? this.id,
@@ -73,6 +77,7 @@ class FeedModel {
       createdAt: createdAt ?? this.createdAt,
       actorProfileUrl: actorProfileUrl ?? this.actorProfileUrl,
       actorRole: actorRole ?? this.actorRole,
+      badgeId: badgeId ?? this.badgeId,
     );
   }
 
@@ -131,6 +136,7 @@ class FeedModel {
       createdAt: json['createdAt'] != null ? (json['createdAt'] as Timestamp).toDate() : null,
       actorProfileUrl: json['actorProfileUrl'],
       actorRole: json['actorRole'],
+      badgeId: json['badgeId'] as String?,
     );
   }
 
@@ -152,6 +158,7 @@ class FeedModel {
       'createdAt': createdAt != null ? Timestamp.fromDate(createdAt!) : null,
       'actorProfileUrl': actorProfileUrl,
       'actorRole': actorRole,
+      if (badgeId != null && badgeId!.isNotEmpty) 'badgeId': badgeId,
     };
   }
 }

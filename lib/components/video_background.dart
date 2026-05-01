@@ -18,6 +18,7 @@ class _VideoBackdropState extends State<VideoBackdrop> {
     super.initState();
     _controller = VideoPlayerController.asset(
       'assets/videos/arena_ovr_background.mp4',
+      videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
     );
     _controller.initialize().then((_) {
       if (!mounted) return;

@@ -27,7 +27,7 @@ class LeaderboardController extends GetxController {
 
   int get totalPoints {
     return ranked.fold<int>(0, (sum, u) {
-      final r = u.currentRating;
+      final r = u.rawBucketPoints;
       final a = ((r['Athlete'] ?? r['Competitor'] ?? r['Performance'] ?? 0) as num);
       final s = ((r['Student'] ?? r['Class'] ?? 0) as num);
       final t = ((r['Teammate'] ?? r['Program'] ?? 0) as num);
@@ -45,8 +45,10 @@ class LeaderboardController extends GetxController {
 
   double _categoryValue(UserModel u, String categoryKey) {
     final aliases = _categoryAliases[categoryKey] ?? [categoryKey];
+    // Prefer raw bucket points (actual awarded totals) for display.
+    final src = u.rawBucketPoints.isNotEmpty ? u.rawBucketPoints : u.currentRating;
     for (final k in aliases) {
-      final v = u.currentRating[k];
+      final v = src[k];
       if (v != null) return (v as num).toDouble();
     }
     return 0;

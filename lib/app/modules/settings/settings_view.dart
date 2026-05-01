@@ -10,6 +10,7 @@ import '../../core/constants/app_colors.dart';
 import '../../core/widgets/stadium_background.dart';
 import '../../core/components/animated_glowing_border.dart';
 import '../../data/models/user_model.dart';
+import '../../routes/app_routes.dart';
 
 class SettingsView extends GetView<SettingsController> {
   const SettingsView({Key? key}) : super(key: key);
@@ -139,6 +140,8 @@ class SettingsView extends GetView<SettingsController> {
                     final player = Get.find<PlayerController>();
                     final athlete = player.athlete.value;
                     final team = player.team.value;
+                    // Must read coachName here so Obx rebuilds when async _fetchCoachName completes.
+                    final coachDisplay = player.coachName.value;
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
@@ -154,7 +157,7 @@ class SettingsView extends GetView<SettingsController> {
                         const SizedBox(height: 20),
                         _buildSectionLabel('TEAM INFO'),
                         const SizedBox(height: 8),
-                        _buildTeamInfoCard(team, athlete),
+                        _buildTeamInfoCard(team, athlete, coachDisplay),
                         const SizedBox(height: 20),
                         _buildSectionLabel('ACCOUNT'),
                         const SizedBox(height: 8),
@@ -653,11 +656,11 @@ class SettingsView extends GetView<SettingsController> {
         ));
   }
 
-  Widget _buildTeamInfoCard(dynamic team, UserModel? athlete) {
-    final player = Get.find<PlayerController>();
+  Widget _buildTeamInfoCard(dynamic team, UserModel? athlete, String? coachDisplay) {
     final teamName = team?.name ?? '—';
     final schoolName = team?.schoolName ?? '—';
-    final coachName = player.coachName.value ?? '—';
+    final coachLabel =
+        (coachDisplay != null && coachDisplay.trim().isNotEmpty) ? coachDisplay.trim() : '—';
 
     return _buildGlassCard(
       children: [
@@ -665,7 +668,7 @@ class SettingsView extends GetView<SettingsController> {
         const SizedBox(height: 12),
         _buildInfoRow('SCHOOL', Icons.school_rounded, schoolName),
         const SizedBox(height: 12),
-        _buildInfoRow('COACH', Icons.person_rounded, coachName),
+        _buildInfoRow('COACH', Icons.person_rounded, coachLabel),
       ],
     );
   }
@@ -718,6 +721,12 @@ class SettingsView extends GetView<SettingsController> {
   Widget _buildAccountCard(BuildContext context) {
     return _buildGlassCard(
       children: [
+        _buildActionRow(
+          'FAQ',
+          Icons.help_outline_rounded,
+          () => Get.toNamed(Routes.FAQ),
+        ),
+        Divider(height: 24, color: Colors.white.withValues(alpha: 0.1)),
         _buildActionRow('Change Password', Icons.chevron_right_rounded, () => controller.changePassword(context)),
         Divider(height: 24, color: Colors.white.withValues(alpha: 0.1)),
         _buildActionRow('Log Out', Icons.logout_rounded, () {
