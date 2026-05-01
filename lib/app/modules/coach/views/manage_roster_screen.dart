@@ -8,7 +8,6 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/widgets/stadium_background.dart';
 import '../../../core/widgets/glass_card.dart';
-import '../../../core/widgets/fire_sparks_background.dart';
 import '../../../core/components/animated_glowing_border.dart';
 import '../../../data/models/user_model.dart';
 import '../../../data/models/team_model.dart';
@@ -472,7 +471,6 @@ class ManageRosterScreen extends StatelessWidget {
       child: Stack(
         fit: StackFit.expand,
         children: [
-          // const FireSparksBackground(),
           Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [

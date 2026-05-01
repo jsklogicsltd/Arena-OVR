@@ -8,7 +8,6 @@ import 'package:intl/intl.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/widgets/stadium_background.dart';
 import '../../core/widgets/glass_card.dart';
-import '../../core/widgets/fire_sparks_background.dart';
 import '../../core/components/animated_glowing_border.dart';
 import '../../data/models/school_model.dart';
 import '../../data/models/user_model.dart';
@@ -94,7 +93,6 @@ class _SchoolDetailsViewState extends State<SchoolDetailsView> {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            // const FireSparksBackground(),
             SafeArea(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,

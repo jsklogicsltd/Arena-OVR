@@ -6,7 +6,6 @@ import 'package:intl/intl.dart';
 import 'notifications_controller.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/widgets/stadium_background.dart';
-import '../../core/widgets/fire_sparks_background.dart';
 
 class NotificationsView extends GetView<NotificationsController> {
   const NotificationsView({Key? key}) : super(key: key);
@@ -19,7 +18,6 @@ class NotificationsView extends GetView<NotificationsController> {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            // const FireSparksBackground(),
             SafeArea(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,

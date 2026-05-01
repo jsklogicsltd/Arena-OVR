@@ -1,3 +1,4 @@
+import 'dart:developer';
 import 'dart:io';
 import 'dart:ui' show Color;
 
@@ -73,21 +74,18 @@ class NotificationService {
         // iOS shows the banner natively via setForegroundNotificationPresentationOptions.
         // Hook here if you later want to mirror to a local notification on Android
         // for foreground display consistency.
-        // ignore: avoid_print
-        print('🔥 FOREGROUND MESSAGE RECEIVED: ${message.notification?.title}');
+        log('🔥 FOREGROUND MESSAGE RECEIVED: ${message.notification?.title}');
       });
       _foregroundListenerAttached = true;
     }
 
     if (Platform.isIOS) {
       final apnsToken = await _messaging.getAPNSToken();
-      // ignore: avoid_print
-      print('🍎 APPLE APNs Token: $apnsToken');
+      log('🍎 APPLE APNs Token: $apnsToken');
     }
 
     final token = await _messaging.getToken();
-    // ignore: avoid_print
-    print('🔥 FIREBASE FCM Token: $token');
+    log('🔥 FIREBASE FCM Token: $token');
 
     if (token == null || token.isEmpty) return;
 
@@ -102,90 +100,4 @@ class NotificationService {
     });
   }
 
-  // ---------------------------------------------------------------------------
-  // QA ONLY — remove before shipping v1.0.5 to production.
-  //
-  // Fires an immediate local notification that exercises every Android native
-  // configuration point at once (channel id, small icon, tint color, runtime
-  // permission). Use it to visually verify the manifest + res/values setup.
-  // ---------------------------------------------------------------------------
-  Future<String?> testAndroidNotification() async {
-    // 1) Ensure core + local plugin are ready.
-    await Firebase.initializeApp();
-
-    // Initialize flutter_local_notifications with the launcher icon as the app
-    // icon (distinct from the *status bar* small icon, which is set per-notif
-    // via AndroidNotificationDetails.icon below).
-    const initSettings = InitializationSettings(
-      android: AndroidInitializationSettings('@mipmap/ic_launcher'),
-      iOS: DarwinInitializationSettings(
-        requestAlertPermission: false,
-        requestBadgePermission: false,
-        requestSoundPermission: false,
-      ),
-    );
-    await _local.initialize(settings: initSettings);
-
-    // 2) Request POST_NOTIFICATIONS explicitly (Android 13+ runtime prompt).
-    //    On Android ≤12 and iOS this short-circuits cleanly.
-    if (Platform.isAndroid) {
-      final androidImpl = _local
-          .resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin
-          >();
-      final granted = await androidImpl?.requestNotificationsPermission();
-      // ignore: avoid_print
-      print('🤖 Android POST_NOTIFICATIONS granted: $granted');
-    } else {
-      final settings = await _messaging.requestPermission(
-        alert: true,
-        badge: true,
-        sound: true,
-      );
-      // ignore: avoid_print
-      print('🍎 iOS auth status: ${settings.authorizationStatus}');
-    }
-
-    // 3) Print the current FCM token (copy from console for Firebase Console tests).
-    final token = await _messaging.getToken();
-    // ignore: avoid_print
-    print('🔥 FCM TOKEN (copy for Firebase test): $token');
-
-    // 4) Create the channel (idempotent) and fire the local notification using
-    //    the exact channel id, drawable icon, and brand tint color from the
-    //    manifest + colors.xml so the visual parity can be validated.
-    await _ensureAndroidChannel();
-
-    const androidDetails = AndroidNotificationDetails(
-      'arena_ovr_default_channel', // matches manifest meta-data
-      'Arena OVR Notifications',
-      channelDescription: 'Coach announcements, points, and reminders',
-      importance: Importance.high,
-      priority: Priority.high,
-      icon: 'ic_stat_notification', // matches @drawable/ic_stat_notification
-      color: Color(0xFF00A3FF), // mirrors @color/colorAccent
-      colorized: true,
-      ticker: 'Arena OVR',
-    );
-
-    const iosDetails = DarwinNotificationDetails(
-      presentAlert: true,
-      presentBadge: true,
-      presentSound: true,
-    );
-
-    const details = NotificationDetails(
-      android: androidDetails,
-      iOS: iosDetails,
-    );
-
-    await _local.show(
-      id: 99901,
-      title: '✅ Arena OVR Test Notification',
-      body: 'If you see the blue tint + glyph icon, Android setup is correct.',
-      notificationDetails: details,
-    );
-
-    return token;
-  }
 }

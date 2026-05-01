@@ -3,7 +3,6 @@ import "package:get/get.dart";
 import '../../data/repositories/auth_repository.dart' as import_repo;
 import "admin_controller.dart";
 import '../../core/widgets/stadium_background.dart';
-import '../../core/widgets/fire_sparks_background.dart';
 
 class AdminView extends GetView<AdminController> {
   const AdminView({Key? key}) : super(key: key);
@@ -33,7 +32,6 @@ class AdminView extends GetView<AdminController> {
         child: Stack(
           fit: StackFit.expand,
           children: const [
-            // FireSparksBackground(),
             Center(
               child: Text("AdminView", style: TextStyle(fontSize: 24, color: Colors.white)),
             ),

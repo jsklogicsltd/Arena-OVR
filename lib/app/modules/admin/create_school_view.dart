@@ -8,7 +8,6 @@ import '../../core/widgets/stadium_background.dart';
 import '../../core/widgets/glass_card.dart';
 import '../../core/widgets/glass_text_field.dart';
 import '../../core/widgets/arena_button.dart';
-import '../../core/widgets/fire_sparks_background.dart';
 import '../../core/components/animated_glowing_border.dart';
 import 'admin_controller.dart';
 
@@ -41,7 +40,6 @@ class _CreateSchoolViewState extends State<CreateSchoolView> {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            // const FireSparksBackground(),
             SafeArea(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
