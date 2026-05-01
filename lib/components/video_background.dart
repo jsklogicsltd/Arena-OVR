@@ -16,18 +16,21 @@ class _VideoBackdropState extends State<VideoBackdrop> {
   @override
   void initState() {
     super.initState();
+    _initVideo();
+  }
+
+  Future<void> _initVideo() async {
     _controller = VideoPlayerController.asset(
       'assets/videos/arena_ovr_background.mp4',
       videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
     );
-    _controller.initialize().then((_) {
-      if (!mounted) return;
-      _controller
-        ..setVolume(0.0)
-        ..setLooping(true)
-        ..play();
-      setState(() {});
-    });
+    await _controller.initialize();
+    await _controller.setVolume(0.0);
+
+    if (!mounted) return;
+    await _controller.setLooping(true);
+    await _controller.play();
+    setState(() {});
   }
 
   @override

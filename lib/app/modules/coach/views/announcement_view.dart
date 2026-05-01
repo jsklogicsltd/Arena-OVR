@@ -5,7 +5,6 @@ import 'package:flutter_animate/flutter_animate.dart';
 import '../coach_controller.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/widgets/stadium_background.dart';
-import '../../../core/widgets/fire_sparks_background.dart';
 import '../../../core/components/animated_glowing_border.dart';
 
 class AnnouncementView extends StatefulWidget {
@@ -54,7 +53,6 @@ class _AnnouncementViewState extends State<AnnouncementView> {
           child: Stack(
             fit: StackFit.expand,
             children: [
-              // const FireSparksBackground(),
               SafeArea(
                 child: Column(
                   children: [
